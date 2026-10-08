@@ -1,0 +1,29 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "terraform-agent"
+version = "0.0.1"
+description = "LLM/VLM agent that turns prompts and reference images into Minecraft terrain"
+requires-python = ">=3.11"
+dependencies = [
+    # Pinned: stable release with Minecraft Java 26.3 support. Do not use 2.0.x alphas (see CLAUDE.md).
+    "amulet-core==1.9.49",
+    "numpy<2",  # amulet-core 1.9.x requires numpy~=1.17; unpinned extras (matplotlib) would pull 2.x
+    "scipy",
+    "pydantic>=2",
+    "anthropic>=1.15,<2",
+    "python-dotenv>=1",
+]
+
+[project.optional-dependencies]
+render = ["matplotlib", "pyvista", "pillow"]
+dev = ["pytest"]
+
+[tool.setuptools.packages.find]
+include = ["terrain*", "agent*", "eval*", "mcp_server*", "scripts*"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["."]

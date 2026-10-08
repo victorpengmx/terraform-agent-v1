@@ -1,0 +1,125 @@
+"""Context manager: decides what the builder sees on each model call.
+
+Episodes: each BUILD round starts a fresh conversation whose opening message is written from current
+state (spec, op list, terrain stats, last critique, notes, latest renders). Inside an episode the
+history is append-only. 
+"""
+
+from __future__ import annotations
+
+import json
+from dataclasses import dataclass, field
+from typing import TYPE_CHECKING, Any
+
+from agent.session import Session
+from agent.tools import Tool, image_block, text_block
+from terrain.config import WORLD_MAX_Y, WORLD_MIN_Y
+
+if TYPE_CHECKING:
+    from agent.critic import CritiqueResult
+
+SYSTEM_PROMPT = """\
+You are the builder in a terrain-generation agent. You shape a Minecraft landscape by calling terrain \
+tools on a heightmap canvas. The tools do all geometry and block placement; you decide intent, layout \
+and proportions.
+
+Canvas conventions:
+- The area is {width} x {depth} blocks. Tool coordinates are normalized (u, v) in [0, 1]: u runs west \
+to east (+x), v runs north to south (+z), (0, 0) is the north-west corner.
+- Heights are Minecraft block y. The world allows y = {min_y} to {max_y}.
+- Lengths such as radius are fractions of the area's shorter side.
+
+How to work:
+- Build large forms first, then details. Prefer a few well-chosen calls over many tiny ones.
+- If a tool returns an error, read it and change the parameters; do not repeat the same call.
+- Use write_note for decisions or progress worth remembering; notes survive when the conversation is \
+reset, chat history does not.
+- If the request needs something no tool can express, say so instead of approximating silently.
+- When the stage is done, reply with a short summary and no tool call."""
+
+
+@dataclass
+class Episode:
+    """One append-only conversation with the builder."""
+
+    messages: list[dict[str, Any]] = field(default_factory=list)
+
+
+class ContextManager:
+    def __init__(
+        self,
+        spec: dict[str, Any],
+        area: tuple[int, int],
+        references: list[bytes] | None = None,
+        max_input_tokens: int = 150_000,
+        max_messages: int = 80,
+    ) -> None:
+        self.spec = spec  # pinned for the whole run (DESIGN §9.3)
+        self.area = area
+        self.references = references or []
+        self.max_input_tokens = max_input_tokens
+        self.max_messages = max_messages
+        self.notes: list[str] = []  # scratchpad: model-written, survives rotation
+        self._system = SYSTEM_PROMPT.format(width=area[0], depth=area[1], min_y=WORLD_MIN_Y, max_y=WORLD_MAX_Y - 1)
+
+    def system_prompt(self) -> str:
+        """Fixed for the run, so the cached prefix (tools + system) stays valid across episodes."""
+        return self._system
+
+    def note_tool(self) -> Tool:
+        def write_note(p: dict[str, Any]) -> str:
+            note = str(p.get("note", "")).strip()
+            if not note:
+                return "note was empty; nothing saved"
+            self.notes.append(note)
+            return f"saved note {len(self.notes)}"
+
+        return Tool(
+            name="write_note",
+            description="Save a short progress note (plan, decision, open problem). Notes are shown to you at the start of every new conversation.",
+            input_schema={
+                "type": "object",
+                "properties": {"note": {"type": "string", "description": "One or two sentences."}},
+                "required": ["note"],
+                "additionalProperties": False,
+            },
+            handler=write_note,
+        )
+
+    def build_episode(
+        self,
+        session: Session,
+        stage: str,
+        critique: CritiqueResult | None = None,
+        renders: list[bytes] | None = None,
+        rolled_back_from: float | None = None,
+        continuing: bool = False,
+    ) -> Episode:
+        """Opening message: references, task, spec, terrain state, critique, notes, latest renders."""
+        parts = [f"# Task\nStage: {stage}. Build this stage of the terrain described by the spec."]
+        if continuing:
+            parts.append("This continues earlier work in this stage; the previous conversation was closed to save context. "
+                         "The state below includes everything done so far.")
+        parts.append("# Spec\n" + json.dumps(self.spec, indent=2, sort_keys=True))
+        parts.append(f"# Current terrain\n{session.stats()}\n\nOps so far:\n{session.summary()}")
+        if critique is not None:
+            parts.append("# Critique of the current terrain\n" + critique.as_text())
+            if rolled_back_from is not None:
+                parts.append(f"Your last revision scored {rolled_back_from:.2f}, lower than this best attempt "
+                             f"({critique.score:.2f}), so it was rolled back. Try a different fix.")
+            parts.append("Address the issues above, most severe first.")
+        if self.notes:
+            parts.append("# Your notes\n" + "\n".join(f"- {n}" for n in self.notes))
+        if self.references:
+            parts.append("Reference images from the user are attached above.")
+        if renders:
+            parts.append("Latest render(s) of the terrain are attached below.")
+
+        content = [image_block(r) for r in self.references]
+        content.append(text_block("\n\n".join(parts)))
+        content.extend(image_block(r) for r in renders or [])
+        return Episode(messages=[{"role": "user", "content": content}])
+
+    def should_rotate(self, episode: Episode, last_input_tokens: int) -> bool:
+        """Start a fresh episode when this one is too long to keep paying for."""
+        return last_input_tokens >= self.max_input_tokens or len(episode.messages) >= self.max_messages

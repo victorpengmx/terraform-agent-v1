@@ -1,0 +1,24 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+.pytest_cache/
+build/
+dist/
+
+# Secrets
+.env
+
+# Run outputs
+traces/
+renders/
+worlds/
+
+# Never commit Minecraft textures (only derived data such as the block colour table)
+textures/
+*.png.mcmeta
+
+# Local Claude Code settings
+.claude/

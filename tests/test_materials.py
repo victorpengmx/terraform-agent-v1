@@ -1,0 +1,147 @@
+import numpy as np
+import pytest
+
+from terrain.materials import SURFACE_BLOCKS, Banded, Condition, Mix, Rule, Single, resolve_surface
+from terrain.ops import OpError, apply_op
+from terrain.opstack import BaseSpec, OpStack
+from terrain.state import WorldState
+
+N = 65
+
+
+def flat(y=64.0):
+    return WorldState.flat(N, N, base_y=y)
+
+
+def with_rules(state, *rules):
+    state.palette_rules = [r.model_dump(mode="json") for r in rules]
+    return state
+
+
+def test_defaults_give_grassland_on_flat_ground():
+    plan = resolve_surface(flat())
+    assert set(plan.column_block.ravel()) <= {"grass_block", "podzol", "coarse_dirt"}
+    assert (plan.column_block == "grass_block").mean() > 0.6
+    assert set(plan.subsurface.ravel()) == {"dirt"}
+
+
+def test_first_matching_rule_wins():
+    s = with_rules(flat(), Rule(when=Condition(y_min=60), use=Single(block="sand")), Rule(use=Single(block="stone")))
+    assert set(resolve_surface(s).column_block.ravel()) == {"sand"}
+    s = with_rules(flat(), Rule(when=Condition(y_min=100), use=Single(block="sand")), Rule(use=Single(block="clay")))
+    assert set(resolve_surface(s).column_block.ravel()) == {"clay"}
+
+
+def test_unmatched_columns_fall_back_to_stone():
+    s = with_rules(flat(), Rule(when=Condition(y_max=10), use=Single(block="sand")))
+    assert set(resolve_surface(s).column_block.ravel()) == {"stone"}
+
+
+def test_slope_and_water_conditions():
+    s = apply_op(flat(), "raise_peak", {"center": [0.5, 0.5], "radius": 0.3, "height": 60, "steepness": 0.888, "roughness": 0})
+    s.water[:, :3] = 65.0  # a strip of water along the west edge
+    s = with_rules(
+        s,
+        Rule(when=Condition(water_dist_max=2), use=Single(block="gravel")),
+        Rule(when=Condition(slope_min=50), use=Single(block="tuff")),
+        Rule(use=Single(block="grass_block")),
+    )
+    blocks = resolve_surface(s).column_block
+    assert np.all(blocks[:, :5] == "gravel") and not np.any(blocks[:, 5] == "gravel")  # 3 wet + 2 within distance
+    assert (blocks == "tuff").any() and blocks[32, 32] == "grass_block"  # summit is flat-ish, flanks steep
+
+
+def test_mix_proportions_and_patches():
+    s = with_rules(flat(), Rule(use=Mix(blocks={"grass_block": 3, "podzol": 1}, patch_size=0.05)))
+    blocks = resolve_surface(s).column_block
+    share = (blocks == "podzol").mean()
+    assert 0.2 < share < 0.3
+    # Patches, not salt-and-pepper: most neighbours share a block.
+    same = (blocks[:, 1:] == blocks[:, :-1]).mean()
+    assert same > 0.85
+
+
+def test_banded_strata_vary_with_y_and_are_deterministic():
+    s = with_rules(flat(), Rule(use=Banded(blocks=["stone", "tuff", "calcite"], band_min=2, band_max=3, noise=0)))
+    plan = resolve_surface(s)
+    column = [plan.surface_block(np.full((N, N), float(y)))[10, 10] for y in range(40, 80)]
+    assert len(set(column)) > 1
+    runs = [len(list(g)) for _, g in __import__("itertools").groupby(column)]
+    assert max(runs[1:-1] or [2]) <= 6  # bands are thin (consecutive equal picks may merge)
+    plan2 = resolve_surface(s)
+    assert np.array_equal(plan.surface_block(np.full((N, N), 50.0)), plan2.surface_block(np.full((N, N), 50.0)))
+
+
+def test_feature_condition_uses_op_footprint():
+    stack = OpStack(BaseSpec(N, N, 64))
+    stack.add("raise_peak", {"center": [0.3, 0.3], "radius": 0.2, "height": 30}, id="hill")
+    stack.add("set_palette_rules", {"rules": [
+        {"when": {"feature": "hill"}, "use": {"kind": "single", "block": "moss_block"}},
+        {"use": {"kind": "single", "block": "sand"}},
+    ]})
+    blocks = resolve_surface(stack.state).column_block
+    assert blocks[19, 19] == "moss_block" and blocks[60, 60] == "sand"
+
+
+def test_set_palette_rules_rejects_unknown_feature_and_block():
+    stack = OpStack(BaseSpec(N, N, 64))
+    with pytest.raises(OpError, match="unknown feature 'nope'"):
+        stack.add("set_palette_rules", {"rules": [{"when": {"feature": "nope"}, "use": {"kind": "single", "block": "sand"}}]})
+    with pytest.raises(OpError, match="invalid params"):
+        stack.add("set_palette_rules", {"rules": [{"use": {"kind": "single", "block": "diamond_block"}}]})
+
+
+def test_paint_region_overrides_rules():
+    stack = OpStack(BaseSpec(N, N, 64))
+    stack.add("paint_region", {"region": {"polygon": [[0, 0], [0.5, 0], [0.5, 0.5], [0, 0.5]]}, "block": "gravel"})
+    plan = resolve_surface(stack.state)
+    assert plan.column_block[5, 5] == "gravel" and plan.column_block[60, 60] != "gravel"
+    assert plan.subsurface[5, 5] == "gravel"
+
+
+def test_default_blocks_are_all_in_the_allowed_list():
+    from terrain.materials import DEFAULT_RULES
+
+    used = set()
+    for r in DEFAULT_RULES:
+        u = r.use
+        used |= {u.block} if isinstance(u, Single) else set(u.blocks)
+    assert used <= set(SURFACE_BLOCKS)
+
+
+def test_block_looks_cover_every_block_and_match_the_colour_table():
+    import json
+    from pathlib import Path
+
+    from terrain.materials import BLOCK_LOOKS, SURFACE_BLOCKS
+    from terrain.ops import get_op
+
+    colours = json.loads((Path(__file__).parents[1] / "terrain" / "render" / "block_colors.json").read_text())["colors"]
+    for block in SURFACE_BLOCKS:
+        r, g, b = colours[block]["top"]
+        lum = 0.2126 * r + 0.7152 * g + 0.0722 * b
+        look = BLOCK_LOOKS[block]
+        if "white" in look and "pinkish" not in look:
+            assert lum > 200, (block, look, lum)
+        if "pale" in look:
+            assert lum > 150, (block, look, lum)
+        if "dark" in look or "black" in look:
+            assert lum < 115, (block, look, lum)
+        if "blue" in look and "grey" not in look:
+            assert b > max(r, g), (block, look)
+    description = get_op("set_palette_rules").params.model_json_schema()["properties"]["rules"]["description"]
+    assert all(f"{block}: {BLOCK_LOOKS[block]}" in description for block in SURFACE_BLOCKS)
+
+
+def test_banded_strata_tilt_with_noise_and_stay_level_without():
+    import numpy as np
+
+    from terrain.materials import MAX_BAND_DIP, _dip
+    from terrain.state import WorldState
+
+    s = WorldState.flat(65, 65, base_y=64)
+    assert np.all(_dip(s, 0.0, seed=3) == 0)  # noise 0: perfectly level (vanilla badlands)
+    plane = _dip(s, 0.5, seed=3)
+    gz, gx = np.gradient(plane)
+    assert np.allclose(np.hypot(gx, gz), MAX_BAND_DIP * 0.5)  # a plane with the promised dip
+    assert not np.allclose(_dip(s, 0.5, seed=4), plane)  # direction varies with the seed
