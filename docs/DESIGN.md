@@ -180,7 +180,8 @@ edge: fade width beyond the region (fraction of the shorter side)
 One module builds a 0–1 weight from it on top of the brush helpers (§5.4). Used by **modifiers**:
 `raise_region`, `smooth`, `warp`, `roughen`, `erode`, `paint_region`. Ops whose geometry is their
 definition keep their own parameters: `raise_peak` (center, radius), `carve_valley` and `carve_river`
-(path). Paths must be smoothed: raw polylines read as zigzags with hard edges. [Later] `exclude: [region,
+(path). Paths must be smoothed: raw polylines read as zigzags with hard edges. All of them use one
+Catmull-Rom curve through the points (`brushes.smooth_path`). [Later] `exclude: [region,
 ...]` keeps a precise feature out of a broad modifier; global application stays the default.
 
 ### 5.3 `character` presets and calibration [MVP]
@@ -238,7 +239,8 @@ gaussian), combined by `blend(height, value, weight, mode)` with modes `add`, `m
   path, so it never rises and cuts gorges through ridges. The path must end at the area edge or existing
   water, else an error. **Lay water out in whole blocks** (bed floored, surface ≥ 1 block above, submerged
   columns a full block under the surface) and contain it against the banks *as the compiler will round
-  them*, digging rather than draining. Otherwise shallow rivers round away at compile.
+  them*, digging rather than draining. Otherwise shallow rivers round away at compile. The channel floor
+  is half a path sample wide, so columns between samples never sit above the bed.
 - `fill_lake(at, max_depth)`: priority flood from the border gives each column's spill level; fill the
   connected basin to min(spill, ground + max_depth). No basin → error.
 - `set_sea_level(level)`.
@@ -284,7 +286,8 @@ validated, clean schema):
 - [MVP] schema validation (unknown fields rejected), world height limits in `apply_op`, all-or-nothing
   edits, agent-readable errors with fix amounts.
 - [MVP] max changed volume per call (sum |Δh|, configurable); the error suggests narrowing the region or
-  lowering strength.
+  lowering strength. Limit: 40 blocks per column on average (`MAX_MEAN_DH`), checked on agent `add` and
+  `update_op`, not on `remove_op` (undo is never limited). The largest demo edit is 26.
 - [Later] protected masks (user-drawn), feature drift warnings (§4.3).
 
 ### 5.9 Trace-driven tool review

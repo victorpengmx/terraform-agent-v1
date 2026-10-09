@@ -78,6 +78,11 @@ def test_control_tools_list_update_remove(session):
     assert r["is_error"] is False and session.state.height.max() == pytest.approx(144)
     bad = execute(tools, tool_use("update_op", {"id": "m", "params": {"radius": 3}}))
     assert bad["is_error"] is True and session.state.height.max() == pytest.approx(144)
+    # JSON-encoded params (seen from Haiku) are accepted; anything else is an agent-facing error, not a crash.
+    r = execute(tools, tool_use("update_op", {"id": "m", "params": '{"height": 90}'}))
+    assert r["is_error"] is False and session.state.height.max() == pytest.approx(154)
+    bad = execute(tools, tool_use("update_op", {"id": "m", "params": "height=100"}))
+    assert bad["is_error"] is True and "must be an object" in bad["content"]
 
     assert execute(tools, tool_use("remove_op", {"id": "nope"}))["is_error"] is True
     assert execute(tools, tool_use("remove_op", {"id": "m"}))["is_error"] is False

@@ -7,7 +7,7 @@ from typing import Literal
 import numpy as np
 from pydantic import Field
 
-from terrain.brushes import blend, length_to_blocks, path_distance
+from terrain.brushes import blend, length_to_blocks, path_distance, smooth_path
 from terrain.ops.registry import Norm, OpParams, Point, register_op
 from terrain.state import WorldState
 
@@ -26,7 +26,7 @@ def carve_valley(state: WorldState, p: CarveValleyParams) -> WorldState:
     Depth is relative to the existing terrain, so the floor follows the land. For flowing water use
     carve_river afterwards in the valley; it enforces a downhill bed.
     """
-    dist, _ = path_distance(state, p.path)
+    dist, _ = path_distance(state, smooth_path(state, p.path))
     s = np.clip(dist / (length_to_blocks(state, p.width) / 2), 0.0, 1.0)  # 0 on the floor line, 1 at the rim
     t = 1.0 - s
     shape = t * t * (3.0 - 2.0 * t) if p.profile == "v" else 1.0 - s**4

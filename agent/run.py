@@ -20,6 +20,7 @@ import argparse
 import hashlib
 import json
 import subprocess
+import sys
 from pathlib import Path
 from typing import Any, Callable
 
@@ -53,6 +54,7 @@ def main() -> None:
     ap.add_argument("--render", choices=["l1", "l2", "none"], default="l1", help="images shown to builder and critic")
     args = ap.parse_args()
     load_dotenv(ENV_FILE, override=False)
+    sys.stdout.reconfigure(encoding="utf-8", errors="replace")  # model text (e.g. "≈") on a cp1252 Windows console
 
     session = Session.flat(*args.size, base_y=args.base_y)
     tracer = Tracer()

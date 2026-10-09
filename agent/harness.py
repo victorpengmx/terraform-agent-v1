@@ -148,7 +148,12 @@ def run_stage(run: _Run, episode: Episode, stage: str, render: Renderer | None =
 
         match response.stop_reason:
             case "tool_use":
-                results = [execute(run.tools, tu) for tu in response.tool_uses]
+                try:
+                    results = [execute(run.tools, tu) for tu in response.tool_uses]
+                except Exception as e:  # a bug: record the calls that triggered it, then let it propagate
+                    calls = [{"name": tu.name, "input": tu.input} for tu in response.tool_uses]
+                    _trace(run, stage, response, tool_calls=calls, note=f"crash in a tool: {type(e).__name__}: {e}")
+                    raise
                 _trace(run, stage, response, tool_calls=_tool_log(response, results))
                 u = response.usage
                 if run.context.should_rotate(episode, u.input_tokens + u.cache_read_tokens + u.cache_write_tokens):

@@ -35,6 +35,24 @@ def block_grid(state: WorldState) -> tuple[np.ndarray, np.ndarray]:
     return np.meshgrid(np.arange(state.width, dtype=np.float32), np.arange(state.depth, dtype=np.float32))
 
 
+def smooth_path(state: WorldState, points: Sequence[Sequence[float]]) -> list[tuple[float, float]]:
+    """Catmull-Rom curve through normalized points (they stay on the path), sampled about every 2 blocks.
+
+    Every op path goes through this: raw polylines read as zigzags with hard corners (DESIGN §5.2).
+    """
+    pts = np.array([to_blocks(state, p) for p in points], dtype=np.float64)
+    ext = np.vstack([pts[0], pts, pts[-1]])  # repeat the ends so the curve starts and ends on them
+    out = []
+    for i in range(len(pts) - 1):
+        p0, p1, p2, p3 = ext[i], ext[i + 1], ext[i + 2], ext[i + 3]
+        n = max(2, int(np.ceil(np.hypot(*(p2 - p1)) / 2.0)))
+        t = np.linspace(0.0, 1.0, n, endpoint=False)[:, None]
+        out.append(0.5 * (2 * p1 + (p2 - p0) * t + (2 * p0 - 5 * p1 + 4 * p2 - p3) * t**2 + (3 * p1 - p0 - 3 * p2 + p3) * t**3))
+    curve = np.vstack([*out, pts[-1:]])
+    scale = np.array([max(state.width - 1, 1), max(state.depth - 1, 1)], dtype=np.float64)
+    return [tuple(q) for q in np.clip(curve / scale, 0.0, 1.0)]
+
+
 # ---------------------------------------------------------------- distances and masks
 
 

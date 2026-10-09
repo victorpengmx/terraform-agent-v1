@@ -27,9 +27,7 @@ Sessions: name the item at the start; check it off and commit when done.
       features derived from each op's diff (§4.1)
 - [x] Terrain ops: `noise_base`, `raise_peak`, `raise_region`, `carve_valley`, `smooth`, `erode`, `warp`,
       `roughen`, `terrace` (§5.5)
-      Gap: `carve_valley` uses its raw polyline; §5.2 says op paths must be spline-smoothed.
 - [x] Water ops: `carve_river`, `fill_lake`, `set_sea_level` with whole-block layout (§5.5)
-      Gap: `carve_river` path is not spline-smoothed either (only `meander` bends it).
 - [x] Invariant tests per op, plus the no-raw-knobs schema test
 - [ ] Calibration sweep script; verdict recorded in EVIDENCE.md
       Script done (`scripts/calibration_sweep.py`); no verdict in EVIDENCE.md yet.
@@ -55,10 +53,10 @@ Sessions: name the item at the start; check it off and commit when done.
 - [x] Inner loop with explicit stop-reason handling; budgets (steps, cost, time)
 - [x] Context manager: episodes built from state, rotation, pinned scratchpad, byte-stable prefix
 - [x] Tracing with run header; final op stack and renders saved (also on budget stop or crash)
-- [ ] Guardrail: max changed volume per call (§5.8)
-      Not implemented: nothing in `apply_op` or the op stack limits sum |Δh| per call.
+- [x] Guardrail: max changed volume per call (§5.8)
 - [ ] Milestone: prompt → Haiku build → compiled world, checked in game
-      No run recorded (`traces/` is empty).
+      Built and compiled (`traces/20261022-133743-e5a431.jsonl`, `TerraformTest` at x=900, z=0);
+      waiting for the in-game check.
 
 ### M4. Critic and acceptance (§11)
 

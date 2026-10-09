@@ -17,7 +17,8 @@ import numpy as np
 from pydantic import Discriminator, Field, Tag
 from scipy.ndimage import distance_transform_edt
 
-from terrain.brushes import circle_distance, edge_weight, feature_mask, length_to_blocks, path_distance, polygon_distance, polygon_inside, to_blocks
+from terrain.brushes import (circle_distance, edge_weight, feature_mask, length_to_blocks, path_distance, polygon_distance,
+                             polygon_inside, smooth_path, to_blocks)
 from terrain.ops.registry import Norm, OpError, OpParams, Point
 from terrain.state import WorldState
 
@@ -109,24 +110,9 @@ def region_shape(state: WorldState, region: Region | None) -> tuple[np.ndarray, 
     return inside, np.asarray(signed)  # keep its dtype: feature fades were float64 before the migration
 
 
-def _smooth_points(state: WorldState, points: list) -> list[tuple[float, float]]:
-    """Catmull-Rom curve through the points (they stay on the path), sampled about every 2 blocks."""
-    pts = np.array([to_blocks(state, p) for p in points], dtype=np.float64)
-    ext = np.vstack([pts[0], pts, pts[-1]])  # repeat the ends so the curve starts and ends on them
-    out = []
-    for i in range(len(pts) - 1):
-        p0, p1, p2, p3 = ext[i], ext[i + 1], ext[i + 2], ext[i + 3]
-        n = max(2, int(np.ceil(np.hypot(*(p2 - p1)) / 2.0)))
-        t = np.linspace(0.0, 1.0, n, endpoint=False)[:, None]
-        out.append(0.5 * (2 * p1 + (p2 - p0) * t + (2 * p0 - 5 * p1 + 4 * p2 - p3) * t**2 + (3 * p1 - p0 - 3 * p2 + p3) * t**3))
-    curve = np.vstack([*out, pts[-1:]])
-    scale = np.array([max(state.width - 1, 1), max(state.depth - 1, 1)], dtype=np.float64)
-    return [tuple(q) for q in np.clip(curve / scale, 0.0, 1.0)]
-
-
 def _path_signed_distance(state: WorldState, path: PathSpec) -> np.ndarray:
     """Signed distance to a smooth path whose half-width wobbles gently along its length."""
-    points = _smooth_points(state, path.points)
+    points = smooth_path(state, path.points)
     dist, t = path_distance(state, points)
     curve = np.array([to_blocks(state, p) for p in points])
     length = float(np.hypot(*np.diff(curve, axis=0).T).sum())

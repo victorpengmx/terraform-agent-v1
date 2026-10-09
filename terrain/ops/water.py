@@ -11,7 +11,7 @@ from pydantic import Field
 from scipy.ndimage import label, map_coordinates
 from scipy.spatial import cKDTree
 
-from terrain.brushes import length_to_blocks, to_blocks
+from terrain.brushes import length_to_blocks, smooth_path, to_blocks
 from terrain.ops.registry import Norm, OpError, OpParams, Point, register_op
 from terrain.state import WorldState
 
@@ -106,25 +106,15 @@ def carve_river(state: WorldState, p: CarveRiverParams) -> WorldState:
     The bed always runs downhill (it cuts through rises instead of climbing them), and water never stands
     above its banks. The river must end at the area edge or in existing water (e.g. a lake from fill_lake).
     """
-    path = [tuple(pt) for pt in p.path]
-    end_u, end_v = path[-1]
+    end_u, end_v = p.path[-1]
     ex, ez = (int(round(c)) for c in to_blocks(state, (end_u, end_v)))
-    on_edge = min(end_u, 1 - end_u, end_v, 1 - end_v) <= EDGE_TOLERANCE
-    if not on_edge and np.isnan(state.water[ez, ex]):
+    if not _ends_on_edge(end_u, end_v) and np.isnan(state.water[ez, ex]):
         raise OpError(
             f"the river's last point (u={end_u:.2f}, v={end_v:.2f}) is neither at the area edge nor in water. "
             "Extend the path to an edge (u or v = 0 or 1) or create a lake there first with fill_lake."
         )
-    if on_edge:
-        path[-1] = snap_to_edge(state, end_u, end_v)
-
-    pts = densify(np.array([to_blocks(state, pt) for pt in path]))
+    pts = river_centerline(state, p)
     half = max(length_to_blocks(state, p.width) / 2, 1.0)
-    if p.meander > 0:
-        path_len = len(pts) * SAMPLE_STEP
-        pts = meander(pts, amplitude=p.meander * (3 * half + 0.05 * path_len), seed=state.seed)
-        pts[:, 0] = np.clip(pts[:, 0], 0, state.width - 1)
-        pts[:, 1] = np.clip(pts[:, 1], 0, state.depth - 1)
 
     # Bed profile along the path: never higher than any earlier point.
     ground = map_coordinates(state.height, [pts[:, 1], pts[:, 0]], order=1, mode="nearest")
@@ -142,7 +132,10 @@ def carve_river(state: WorldState, p: CarveRiverParams) -> WorldState:
     # column under the surface is cut a full block below it: a flat floor, banks never below the water.
     bed_block = np.floor(bed_col)
     surface = bed_block + max(1.0, round(p.depth) - 1.0)
-    channel = bed_block + (surface + 1.0 - bed_block) * (dist / half) ** 2  # parabolic cross-section
+    # Parabolic cross-section with a floor half a sample step wide: columns between samples would otherwise
+    # sit up to ~0.01 above the bed, and the bed must never rise along the river.
+    floor_dist = np.maximum(dist - SAMPLE_STEP / 2, 0.0)
+    channel = bed_block + (surface + 1.0 - bed_block) * (floor_dist / half) ** 2
     channel = np.where(channel < surface, np.minimum(channel, surface - 1.0), channel)
     state.height = np.minimum(state.height, channel).astype(np.float32)
 
@@ -151,6 +144,27 @@ def carve_river(state: WorldState, p: CarveRiverParams) -> WorldState:
     wet, level, state.height = contain_by_digging(state.height, candidates, surface, outlets=existing)
     state.water = np.where(wet, level, state.water).astype(np.float32)
     return state
+
+
+def _ends_on_edge(u: float, v: float) -> bool:
+    return min(u, 1 - u, v, 1 - v) <= EDGE_TOLERANCE
+
+
+def river_centerline(state: WorldState, p: CarveRiverParams) -> np.ndarray:
+    """The river's channel line in block coordinates (n, 2) as (x, z), source to mouth: end snapped to the
+    edge, spline-smoothed, densified, meandered. Depends only on the area size, params and seed, so feature
+    measurement can recompute it for an op in the stack."""
+    path = [tuple(pt) for pt in p.path]
+    if _ends_on_edge(*path[-1]):
+        path[-1] = snap_to_edge(state, *path[-1])
+    pts = densify(np.array([to_blocks(state, pt) for pt in smooth_path(state, path)]))
+    if p.meander > 0:
+        half = max(length_to_blocks(state, p.width) / 2, 1.0)
+        path_len = len(pts) * SAMPLE_STEP
+        pts = meander(pts, amplitude=p.meander * (3 * half + 0.05 * path_len), seed=state.seed)
+        pts[:, 0] = np.clip(pts[:, 0], 0, state.width - 1)
+        pts[:, 1] = np.clip(pts[:, 1], 0, state.depth - 1)
+    return pts
 
 
 def contain_by_digging(height: np.ndarray, wet: np.ndarray, level: np.ndarray, outlets: np.ndarray):

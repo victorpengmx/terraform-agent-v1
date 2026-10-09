@@ -102,6 +102,18 @@ def test_valley_only_lowers_and_reaches_depth_on_path(profile):
     assert np.all(s.height[:20, :] == hilly.height[:20, :])  # beyond the rim (half width 9.6 blocks)
 
 
+def test_valley_floor_curves_through_its_points():
+    hilly = apply_op(flat(), "raise_region", {"region": {"polygon": [[0, 0], [1, 0], [1, 1], [0, 1]]}, "height": 40, "edge": 0})
+    points = [[0.125, 0.125], [0.5, 0.875], [0.875, 0.125]]  # on block columns (x, z = 8, 32, 56)
+    s = apply_op(hilly, "carve_valley", {"path": points, "width": 0.1, "depth": 20})
+    rim = float(hilly.height[0, 0])
+    for u, v in points:
+        assert s.height[round(v * 64), round(u * 64)] == pytest.approx(rim - 20, abs=1e-3)
+    # The tip is rounded: 2 blocks inside the V the raw polyline's arms are < 1 block away (~17 deep);
+    # the smoothed floor passes the tip horizontally, so that column is cut much less.
+    assert s.height[54, 32] > rim - 10
+
+
 def test_u_valley_has_flatter_floor_than_v():
     args = {"path": [[0, 0.5], [1, 0.5]], "width": 0.4, "depth": 20}
     v = apply_op(flat(), "carve_valley", args | {"profile": "v"}).height[:, 32]

@@ -6,11 +6,12 @@ no tool touches globals. Snapshots are op-stack checkpoints, used for score-gate
 
 from __future__ import annotations
 
-from typing import Any
+from typing import Any, Callable
 
 import numpy as np
 
-from terrain.ops import get_op
+from terrain.config import MAX_MEAN_DH
+from terrain.ops import OpError, get_op
 from terrain.ops.region import region_shape
 from terrain.ops.registry import validate_params
 from terrain.opstack import BaseSpec, Checkpoint, OpEntry, OpStack
@@ -21,12 +22,15 @@ OpRecord = OpEntry
 
 
 class Session:
-    def __init__(self, stack: OpStack) -> None:
+    def __init__(self, stack: OpStack, max_changed_volume: float | None = None) -> None:
+        """`max_changed_volume`: guardrail on sum |Δh| per agent call (DESIGN §5.8); default from config."""
         self.stack = stack
+        base = stack.base
+        self.max_changed_volume = max_changed_volume if max_changed_volume is not None else MAX_MEAN_DH * base.width * base.depth
 
     @classmethod
-    def flat(cls, width: int, depth: int, base_y: float = 64.0, seed: int = 0) -> Session:
-        return cls(OpStack(BaseSpec(width, depth, base_y=base_y, seed=seed)))
+    def flat(cls, width: int, depth: int, base_y: float = 64.0, seed: int = 0, max_changed_volume: float | None = None) -> Session:
+        return cls(OpStack(BaseSpec(width, depth, base_y=base_y, seed=seed)), max_changed_volume=max_changed_volume)
 
     @property
     def state(self) -> WorldState:
@@ -38,13 +42,28 @@ class Session:
 
     def apply(self, op: str, params: dict[str, Any], id: str | None = None) -> OpEntry:
         """Add one op. Raises OpError (agent-facing) and leaves the session unchanged on failure."""
-        return self.stack.add(op, params, id=id)
+        return self._guarded(lambda: self.stack.add(op, params, id=id))
 
     def update(self, op_id: str, params: dict[str, Any]) -> OpEntry:
-        return self.stack.update(op_id, params)
+        return self._guarded(lambda: self.stack.update(op_id, params))
 
     def remove(self, op_id: str) -> OpEntry:
-        return self.stack.remove(op_id)
+        return self.stack.remove(op_id)  # undoing is never limited
+
+    def _guarded(self, edit: Callable[[], OpEntry]) -> OpEntry:
+        """Run one edit; undo it and raise OpError if it moves more terrain than the guardrail allows."""
+        before = self.stack.checkpoint()
+        entry = edit()
+        moved = float(np.abs(self.stack.state.height - before.state.height).sum())
+        if moved > self.max_changed_volume:
+            self.stack.restore(before)
+            columns = self.state.width * self.state.depth
+            raise OpError(
+                f"{entry.id} would move {moved:,.0f} blocks of terrain ({moved / columns:.1f} per column on average); "
+                f"the limit per call is {self.max_changed_volume:,.0f} ({self.max_changed_volume / columns:.0f} per column). "
+                "Narrow the region, or lower height, amount or strength."
+            )
+        return entry
 
     def snapshot(self) -> Snapshot:
         return self.stack.checkpoint()

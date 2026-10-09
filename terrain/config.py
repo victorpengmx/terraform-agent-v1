@@ -6,3 +6,7 @@
 # -65 and 320 fails.
 WORLD_MIN_Y = -64
 WORLD_MAX_Y = 320
+
+# Guardrail (DESIGN §5.8): one agent call may move at most this many blocks of height per column on
+# average (sum |Δh| / columns). The demos' largest op is the island's whole-area -26 seafloor.
+MAX_MEAN_DH = 40.0

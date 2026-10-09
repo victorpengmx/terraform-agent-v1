@@ -4,14 +4,13 @@ import numpy as np
 import pytest
 
 from terrain.ops import OpError, apply_op, get_op
-from terrain.brushes import to_blocks
+from terrain.brushes import smooth_path, to_blocks
 from terrain.ops.region import (
     PATH_WOBBLE,
     CircleRegion,
     FeatureRegion,
     PathRegion,
     PolygonRegion,
-    _smooth_points,
     region_shape,
     region_weight,
 )
@@ -46,7 +45,7 @@ def test_path_width_is_the_full_width_with_a_gentle_wobble():
 
 def test_path_is_a_smooth_curve_through_its_points():
     pts = [[0.1, 0.1], [0.5, 0.1], [0.5, 0.5], [0.9, 0.6]]  # two right-angle corners
-    curve = np.array([to_blocks(flat(), q) for q in _smooth_points(flat(), pts)])
+    curve = np.array([to_blocks(flat(), q) for q in smooth_path(flat(), pts)])
     for q in pts:  # passes through every control point
         assert np.hypot(*(curve - to_blocks(flat(), q)).T).min() < 1e-6
     d = np.diff(curve, axis=0)

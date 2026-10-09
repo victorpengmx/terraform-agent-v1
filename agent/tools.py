@@ -90,7 +90,15 @@ def control_tools(session: Session) -> list[Tool]:
     """Observe/control tools over the op stack (DESIGN §5.6): list_ops, update_op, remove_op."""
 
     def update(p: dict[str, Any]) -> Content:
-        entry = session.update(str(p.get("id", "")), dict(p.get("params") or {}))
+        params = p.get("params") or {}
+        if isinstance(params, str):  # models sometimes send the object JSON-encoded (first Haiku run, 2026-10-22)
+            try:
+                params = json.loads(params)
+            except json.JSONDecodeError:
+                pass
+        if not isinstance(params, dict):
+            raise OpError(f'update_op params must be an object of parameters to change, e.g. {{"height": 120}}; got {params!r}')
+        entry = session.update(str(p.get("id", "")), params)
         return f"updated {entry.id}; replayed the stack. {entry.id} now: {session.effect(entry, detail=True)}. Terrain now: {session.stats()}"
 
     def remove(p: dict[str, Any]) -> Content:
