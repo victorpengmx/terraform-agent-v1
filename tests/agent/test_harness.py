@@ -1,4 +1,5 @@
 import json
+import random
 
 import numpy as np
 import pytest
@@ -9,7 +10,7 @@ from agent.harness import run_task
 from agent.session import Session
 from agent.tools import observe_tools, op_tools
 from agent.tracing import Tracer
-from fakes import PEAK, ScriptedModel, critique_json, response, text, tool_use
+from fakes import PEAK, ScriptedModel, compare_json, critique_json, response, text, tool_use
 
 
 @pytest.fixture
@@ -84,31 +85,114 @@ def test_episode_rotates_when_context_is_long(session, tmp_path):
     assert len(fresh) == 1 and "continues earlier work" in fresh[0]["content"][-1]["text"]
 
 
-def test_score_gated_rollback_then_accept(session, tmp_path):
-    builder = ScriptedModel(
-        response(tool_use("raise_peak", PEAK), stop="tool_use"), response(text("round 1")),
-        response(tool_use("raise_peak", PEAK | {"height": 100}, id="tu_2"), stop="tool_use"), response(text("round 2")),
-        response(tool_use("raise_peak", PEAK | {"height": 5}, id="tu_3"), stop="tool_use"), response(text("round 3")),
-    )
-    critic = Critic(ScriptedModel(critique_json(3), critique_json(2), critique_json(5, "pass")))
-    result = run(session, builder, tmp_path, critic=critic, max_rounds=3)
+# ---------------------------------------------------------------- acceptance gate (DESIGN §11.4)
 
-    assert result.stop == "accepted" and result.rounds == 3 and result.best_score == 5
-    # Round 2 scored lower, so it was rolled back: round 3 built on round 1's state.
-    assert [r.params["height"] for r in session.ops] == [40, 5]
-    assert np.isclose(session.state.height.max(), 64 + 45)
-    round3_prompt = builder.calls[4]["messages"][0]["content"][-1]["text"]
-    assert "rolled back" in round3_prompt and "too round" in round3_prompt
+HILL_2 = PEAK | {"center": [0.25, 0.25], "radius": 0.2, "height": 10}  # passes every check
+THIN_WALL = {"region": {"polygon": [[0.2, 0.5], [0.8, 0.5], [0.8, 0.53], [0.2, 0.53]]}, "height": 20, "edge": 0}
 
 
-def test_max_rounds_keeps_best_attempt(session, tmp_path):
-    builder = ScriptedModel(
-        response(tool_use("raise_peak", PEAK), stop="tool_use"), response(text("r1")),
-        response(tool_use("raise_peak", PEAK, id="tu_2"), stop="tool_use"), response(text("r2")),
-    )
-    critic = Critic(ScriptedModel(critique_json(4), critique_json(3)))
-    result = run(session, builder, tmp_path, critic=critic, max_rounds=2)
-    assert result.stop == "max_rounds" and result.best_score == 4 and len(session.ops) == 1
+def two_rounds(*round2_ops, rounds=2):
+    """Builder script: round 1 raises PEAK, round 2 applies `round2_ops`, later rounds change nothing."""
+    calls = [response(tool_use("raise_peak", PEAK), stop="tool_use"), response(text("r1"))]
+    calls += [response(*[tool_use(op, params, id=f"tu_2_{i}") for i, (op, params) in enumerate(round2_ops)], stop="tool_use"),
+              response(text("r2"))]
+    calls += [response(text(f"r{n}")) for n in range(3, rounds + 1)]
+    return ScriptedModel(*calls)
+
+
+def revision_first(seed: int, round_no: int) -> bool:
+    return random.Random(seed * 1000 + round_no).random() < 0.5  # same rule as the harness
+
+
+def previous_wins(seed: int, round_no: int) -> str:
+    return "2" if revision_first(seed, round_no) else "1"
+
+
+def test_first_attempt_is_the_baseline_and_a_pass_ends_the_run(session, tmp_path):
+    critic_model = ScriptedModel(critique_json(5, "pass"))
+    result = run(session, two_rounds(("raise_peak", HILL_2)), tmp_path, critic=Critic(critic_model), max_rounds=2)
+    assert result.stop == "accepted" and result.accepted_round == 1 and result.score == 5
+    assert len(critic_model.calls) == 1  # nothing to compare against in round 1
+
+
+def test_check_regression_rolls_back_without_a_comparison(session, tmp_path):
+    builder = two_rounds(("raise_region", THIN_WALL), rounds=3)
+    critic_model = ScriptedModel(critique_json(3), critique_json(4), critique_json(3), compare_json("same"))
+    result = run(session, builder, tmp_path, critic=Critic(critic_model), max_rounds=3)
+
+    assert result.critiques[1].regressions(result.critiques[0])[0].name == "thin_features"
+    # Round 2 was rolled back before any comparison: critique, critique, critique, then round 3's comparison.
+    assert [c["response_schema"]["title"] for c in critic_model.calls] == ["CritiqueOutput"] * 3 + ["CompareOutput"]
+    round3 = builder.calls[4]["messages"][0]["content"][-1]["text"]
+    assert "Round 2 was not kept" in round3 and "thin_features" in round3 and "added raise_region_1" in round3
+    assert [e.op for e in session.ops] == ["raise_peak"] and result.accepted_round == 3
+
+
+@pytest.mark.parametrize("seed", range(6))
+def test_blind_comparison_rolls_back_when_the_previous_attempt_wins(tmp_path, seed):
+    session = Session.flat(33, 33, base_y=64, seed=seed)
+    critic_model = ScriptedModel(critique_json(3), critique_json(5), compare_json(previous_wins(seed, 2), "the peak got worse"))
+    result = run(session, two_rounds(("raise_peak", HILL_2)), tmp_path, critic=Critic(critic_model), max_rounds=2)
+    # A higher rubric score does not matter: the comparison decides, and the run ends on round 1.
+    assert result.accepted_round == 1 and [e.id for e in session.ops] == ["raise_peak_1"]
+    trace = [json.loads(l) for l in (tmp_path / "t.jsonl").read_text().splitlines()]
+    compare = next(r for r in trace if r["stage"] == "terrain/compare")
+    assert compare["scores"]["winner"] == "previous" and compare["scores"]["order"]["1"] == ("revision" if revision_first(seed, 2) else "previous")
+    assert any("rolled back round 2: a blind comparison preferred the accepted attempt: the peak got worse" in (r["note"] or "")
+               for r in trace)
+
+
+def test_both_comparison_orders_occur_across_seeds():
+    assert {revision_first(seed, 2) for seed in range(6)} == {True, False}
+
+
+def test_a_tie_keeps_the_revision(session, tmp_path):
+    critic_model = ScriptedModel(critique_json(4), critique_json(3), compare_json("same"))
+    result = run(session, two_rounds(("raise_peak", HILL_2)), tmp_path, critic=Critic(critic_model), max_rounds=2)
+    assert result.stop == "max_rounds" and result.accepted_round == 2 and len(session.ops) == 2
+
+
+@pytest.mark.parametrize("answers, kept", [(("1", "1"), True), ("previous", False)])
+def test_both_orders_must_agree_to_roll_back(session, tmp_path, answers, kept):
+    if answers == "previous":  # the accepted attempt wins in both orders
+        first = previous_wins(0, 2)
+        answers = (first, "1" if first == "2" else "2")
+    critic_model = ScriptedModel(critique_json(4), critique_json(4), *[compare_json(a) for a in answers])
+    result = run(session, two_rounds(("raise_peak", HILL_2)), tmp_path, critic=Critic(critic_model), max_rounds=2,
+                 compare_both_orders=True)
+    assert len(critic_model.calls) == 4 and (len(session.ops) == 2) is kept
+
+
+def test_an_unusable_critic_reply_is_retried_then_recorded_as_a_failed_round(session, tmp_path):
+    bad = response(text("not json"))
+    critic_model = ScriptedModel(bad, bad)
+    result = run(session, two_rounds(("raise_peak", HILL_2)), tmp_path, critic=Critic(critic_model), max_rounds=1)
+    critique = result.critiques[0]
+    assert critique.failed and "invalid JSON" in critique.failed and critique.checks and critique.verdict == "revise"
+    assert result.stop == "max_rounds" and result.accepted_round == 1
+    assert "critic failed twice" in (tmp_path / "t.jsonl").read_text()
+
+
+def test_one_retry_recovers_the_critique(session, tmp_path):
+    critic_model = ScriptedModel(response(text("not json")), critique_json(5, "pass"))
+    result = run(session, two_rounds(("raise_peak", HILL_2)), tmp_path, critic=Critic(critic_model), max_rounds=1)
+    assert result.stop == "accepted" and result.critiques[0].failed is None
+
+
+def test_the_comparison_never_reveals_which_attempt_is_newer(session, tmp_path):
+    titles = []
+
+    def render(state, title):
+        titles.append(title)
+        return [bytes([0x89]) + b"PNG fake"]
+
+    critic_model = ScriptedModel(critique_json(3), critique_json(3), compare_json("same"))
+    run(session, two_rounds(("raise_peak", HILL_2)), tmp_path, critic=Critic(critic_model), max_rounds=2, render=render)
+    blocks = critic_model.calls[2]["messages"][0]["content"]
+    texts = " ".join(b["text"] for b in blocks if b["type"] == "text")
+    assert "Terrain 1" in texts and "Terrain 2" in texts
+    assert "raise_peak" not in texts and " ops" not in texts and "round" not in texts.lower()
+    assert titles[-2:] == [None, None]  # comparison renders use the renderers' neutral titles
 
 
 def test_render_view_image_reaches_the_model_but_not_the_trace(session, tmp_path):

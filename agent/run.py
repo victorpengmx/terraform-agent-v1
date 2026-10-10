@@ -33,6 +33,7 @@ from agent.models import AnthropicAdapter, ModelConfig
 from agent.session import Session
 from agent.tools import Tool, control_tools, observe_tools, op_tools
 from agent.tracing import Tracer, TraceRecord
+from terrain.state import WorldState
 
 EFFORTS = ["low", "medium", "high", "xhigh", "max"]
 ENV_FILE = Path(__file__).resolve().parents[1] / ".env"  # repo root, regardless of the working directory
@@ -52,6 +53,8 @@ def main() -> None:
     ap.add_argument("--max-steps", type=int, default=Budget.max_steps)
     ap.add_argument("--max-cost", type=float, default=Budget.max_cost_usd, help="USD")
     ap.add_argument("--render", choices=["l1", "l2", "none"], default="l1", help="images shown to builder and critic")
+    ap.add_argument("--compare-both-orders", action="store_true",
+                    help="acceptance gate judges both orders and needs agreement (2x comparison cost; Opus and eval runs)")
     args = ap.parse_args()
     load_dotenv(ENV_FILE, override=False)
     sys.stdout.reconfigure(encoding="utf-8", errors="replace")  # model text (e.g. "≈") on a cp1252 Windows console
@@ -81,10 +84,11 @@ def main() -> None:
             critic=critic,
             render=None if args.render == "none" else make_renderer(args.render, out_dir),
             max_rounds=args.rounds,
+            compare_both_orders=args.compare_both_orders,
         )
         print(result)
     finally:
-        # The harness leaves the session on the best-scoring attempt, so this is the run's final terrain.
+        # The harness leaves the session on the latest accepted attempt, so this is the run's final terrain.
         for path in save_final(session, out_dir):
             print(f"saved {path}")
 
@@ -104,6 +108,7 @@ def run_header(args: argparse.Namespace, images: list[bytes], session: Session, 
         "critic_model": None if args.no_critic else args.critic_model or args.model,
         "effort": args.effort,
         "max_rounds": args.rounds,
+        "compare_both_orders": args.compare_both_orders,
         "render": args.render,
         "budget": {"max_steps": budget.max_steps, "max_cost_usd": budget.max_cost_usd, "max_seconds": budget.max_seconds},
         "canvas": {"width": base.width, "depth": base.depth, "base_y": base.base_y, "seed": base.seed},
@@ -151,21 +156,22 @@ def save_final(session: Session, out_dir: Path, l2_views: tuple[str, ...] = ("ov
     return written
 
 
-def make_renderer(level: str, out_dir: Path) -> Callable[[Session], list[bytes]]:
-    """Harness render callback: PNGs of the current terrain, also saved to `out_dir` for inspection."""
+def make_renderer(level: str, out_dir: Path) -> Callable[[WorldState, str | None], list[bytes]]:
+    """Harness render callback: PNGs of a terrain, also saved to `out_dir` for inspection. A None title gives
+    the renderers' neutral defaults (size and height range), used by the blind comparison."""
     from terrain.render.l1 import render_l1
 
     out_dir.mkdir(parents=True, exist_ok=True)
     count = 0
 
-    def render(session: Session) -> list[bytes]:
+    def render(state: WorldState, title: str | None) -> list[bytes]:
         nonlocal count
-        images = [render_l1(session.state, title=f"{len(session.ops)} ops")]
+        images = [render_l1(state, title=title or "")]
         if level == "l2":
             from terrain.compiler import compile_state
             from terrain.render.l2 import render_volume
 
-            images.append(render_volume(compile_state(session.state), "overview_sw"))
+            images.append(render_volume(compile_state(state), "overview_sw", title=title or "overview_sw"))
         for i, png in enumerate(images):
             (out_dir / f"{count:03d}_{i}.png").write_bytes(png)
         count += 1

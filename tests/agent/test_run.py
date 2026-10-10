@@ -17,7 +17,7 @@ from terrain.opstack import OpStack
 
 def _args(**kw):
     defaults = dict(prompt="a lone volcanic peak", image=[], model="claude-haiku-5-5", effort="low", critic_model=None,
-                    no_critic=False, rounds=2, render="l1")
+                    no_critic=False, rounds=2, render="l1", compare_both_orders=False)
     return argparse.Namespace(**{**defaults, **kw})
 
 
@@ -31,7 +31,7 @@ def test_run_header_records_prompt_references_and_config(tmp_path):
     assert header["references"] == [{"path": "refs/peak.png", "sha256": hashlib.sha256(ref).hexdigest()}]
     assert header["builder_model"] == header["critic_model"] == "claude-haiku-5-5"
     assert header["canvas"] == {"width": 64, "depth": 48, "base_y": 70, "seed": 5}
-    assert header["budget"]["max_steps"] == 10 and header["max_rounds"] == 2
+    assert header["budget"]["max_steps"] == 10 and header["max_rounds"] == 2 and header["compare_both_orders"] is False
 
     # The tool hash changes with the schemas the model sees, and the header round-trips through a trace.
     fewer = {k: v for k, v in tools.items() if k != "remove_op"}

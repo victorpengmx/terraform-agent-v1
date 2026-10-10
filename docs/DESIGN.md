@@ -126,6 +126,31 @@ id. Tool results report the affected feature's stats; `list_ops` shows each op's
 Checks allow one category of slack (one off = minor, two off = major); "unspecified" = no check. Calibrate
 tool parameters against the categories (e.g. `meander` → sinuosity class) and record the table here.
 
+**v1 measurement (`terrain/features.py`, M4):**
+- Each form op is one feature: a peak, a valley, a river, a lake, a sea, or a `raise_region` plateau /
+  basin / raised area / depression. Modifier and materials ops are not features.
+- Attributes are measured over the feature's *body*, the columns where its footprint weight is > 0.5.
+- **Slope class:** the mean slope over the body, on the lightly smoothed surface the palette uses.
+- **Prominence:** classic topographic prominence from one union-find pass over the heightmap. A peak's
+  prominence is its height above the highest col that connects it to higher ground; the area's highest
+  point is measured against the area's lowest. A feature's prominence is the largest among the peaks in
+  its body. Raised features only.
+- **Sinuosity:** recomputed from the exact centre line `carve_river` cut (same params and seed).
+- **Reaches-edge:** the area edges the footprint touches.
+- Limitation: overlapping footprints share measurements. A whole-area seafloor reports the island on it,
+  and island and volcano report one summit. The dominant-feature map (§4.3) fixes this later.
+
+**`meander` → sinuosity (mean of 5 seeds; the same at 128 and 256 blocks):**
+
+| meander | 0 | 0.2 | 0.4 | 0.6 | 0.8 | 1.0 |
+|---|---|---|---|---|---|---|
+| straight 2-point path | 1.00 | 1.01 | 1.02 | 1.05 | 1.08 | 1.12 |
+| 3-point bent path | 1.08 | 1.08 | 1.10 | 1.12 | 1.16 | 1.20 |
+
+`meander` alone never reaches "twisty" (1.25) or "meandering" (1.5); only path points bend a river that
+far. The scale is miscalibrated against the categories (§5.9) and needs recalibrating before the M5
+checklist asks for those classes.
+
 ### 4.3 Feature ↔ op mapping and overlaps [MVP v1 mapping; rest Later]
 
 - One feature can come from several ops (mountain = `raise_peak` + `roughen` + `erode`), and one op can
@@ -557,6 +582,22 @@ al.](https://arxiv.org/abs/2310.01798)); tool-grounded critique works much bette
 - [MVP] built something; no spikes (a column far above all 4 neighbours); slope sanity (share of columns
   above ~70°, share of 1-block steps on gentle ground); water containment; meaningful change vs. the flat
   base; thin features.
+
+  Implemented in M4 (`agent/critic.py` `run_checks`). Thresholds are set so the three demos and the
+  baseline run pass and constructed broken terrains fail (EVIDENCE 2026-10-22):
+
+  | Check | Severity | Measure | Fails when |
+  |---|---|---|---|
+  | built_something | blocking | ops applied | none |
+  | meaningful_change | blocking | columns ≥ 1 block off the flat base, or wet | < 1% (demos: 57–98%) |
+  | no_spikes | major | columns > 3 blocks above all 4 neighbours | any |
+  | steep_share | major | columns dropping ≥ 3 blocks (≈ 72°) to a neighbour, on rounded heights | > 25% (demos: 0.2–10.4%) |
+  | gentle_steps | info | isolated 1-block bumps or pits on gentle ground | never; reported only |
+  | water_containment | major | canvas-wet columns that are dry after compile rounding | > 25% (demos: 1–9%, lake fringes) |
+  | thin_features | major | rounded height ≥ 4 above its 3×3 grey opening (1–2 block pillars and walls) | > 0.2% of columns (demos: ≤ 0.05%) |
+
+  Slope is per block, not a central gradient: central differences compare a column's two neighbours and
+  miss walls that alternate every column. Every message gives the measured number and an example (u, v).
 - [Later] large single-block areas; feature collisions; river connectivity; heights vs. spec; feature drift.
 
 ### 11.3 Spec checklist [MVP: code-checked items; Later: VLM items]
@@ -607,9 +648,24 @@ keep the revision almost always. Design:
    and give the next episode the diff, `why` and the rejected attempt's issues.
 5. The run ends on the latest accepted attempt.
 
+Implementation details (M4, `agent/harness.py`):
+- **Baseline.** Round 1's attempt is accepted as the baseline, failed checks or not: there is nothing to
+  compare it with. A "pass" verdict ends the run only on an accepted attempt.
+- **Rule 2** arrives with the spec checklist (M5); until then, rule 1 goes straight to rule 3.
+- **Order.** `random.Random(run_seed * 1000 + round)` decides whether the revision is Terrain 1.
+- **Neutral renders.** Comparison renders use the renderers' neutral titles (size and height range);
+  builder and critic renders are titled with the op count, which would reveal recency.
+- **Unusable replies.**
+  - Critique: retried once. A second failure records a *failed round*: checks only, `failed` set,
+    verdict "revise", traced. The run continues.
+  - Comparison: retried once, then counts as no winner, so the revision is kept, like a tie. Both
+    failures are traced.
+- **Cost.** A failed call is still charged to the budget (`CriticError` carries the response).
+
 Validation: revision win rate clearly below 100% (above ~90% over 20+ comparisons = still biased); "Terrain
 1" win rate near 50% (else enable both orders); a constructed test (a terrain vs. a broken copy, both
-orders) must pick the intact one.
+orders) must pick the intact one. Tools: `scripts/gate_stats.py` (win rates from traces) and
+`scripts/gate_check.py` (broken copy = the valley demo without water plus a heavy fine ridged roughen).
 
 ### 11.5 Other critic features
 
@@ -827,6 +883,7 @@ terraform-agent/
   terrain/
     config.py               # WORLD_MIN_Y, WORLD_MAX_Y
     state.py                # WorldState, features
+    features.py             # measured feature attributes, categories (§4.2)
     opstack.py              # op stack, replay, checkpoints
     brushes.py              # distances, falloff, blend
     ops/                    # registry.py, region.py, character.py, terrain/water/materials ops
@@ -843,7 +900,8 @@ terraform-agent/
     context.py              # episodes, system prompt, scratchpad
     budget.py, tracing.py, run.py
   eval/                     # benchmark.yaml, run_eval.py, judge.py, reports/
-  scripts/                  # hello_amulet, demos, compile_world, calibration_sweep, migrate_stacks, build_block_colors
+  scripts/                  # hello_amulet, demos, compile_world, calibration_sweep, migrate_stacks, build_block_colors,
+                            # gate_stats, gate_check
   tests/                    # ops/, agent/ (fake model adapter), backends, compiler, render
   traces/ renders/ worlds/  # gitignored run outputs
 ```

@@ -1,12 +1,12 @@
 """Session: the agent's working world (DESIGN §3, §14 row 1).
 
 A thin agent-facing wrapper around the `OpStack` (the source of truth). Tools close over a session, so
-no tool touches globals. Snapshots are op-stack checkpoints, used for score-gated rollback.
+no tool touches globals. Snapshots are op-stack checkpoints, used by the acceptance gate's rollback.
 """
 
 from __future__ import annotations
 
-from typing import Any, Callable
+from typing import Any, Callable, Sequence
 
 import numpy as np
 
@@ -116,16 +116,34 @@ class Session:
         return "block colours show only in L2 renders"
 
     def stats(self) -> str:
-        """Terrain statistics as text: the model never reads raw arrays (DESIGN §10)."""
-        s = self.state
-        h = s.height
-        gz, gx = np.gradient(h)
-        slope = np.degrees(np.arctan(np.hypot(gx, gz)))
-        peak_z, peak_x = np.unravel_index(int(h.argmax()), h.shape)
-        u, v = peak_x / (s.width - 1), peak_z / (s.depth - 1)
-        wet = ~np.isnan(s.water)
-        water = f"{wet.mean() * 100:.0f}% of columns under water" if wet.any() else "no water"
-        return (
-            f"area {s.width}x{s.depth} blocks; height y={h.min():.0f}..{h.max():.0f} (mean {h.mean():.0f}); "
-            f"highest point at (u={u:.2f}, v={v:.2f}); slope mean {slope.mean():.0f}°, max {slope.max():.0f}°; {water}"
-        )
+        return terrain_stats(self.state)
+
+
+def terrain_stats(s: WorldState) -> str:
+    """Terrain statistics as text: the model never reads raw arrays (DESIGN §10). Mentions no op ids, so the
+    blind comparison can use it too."""
+    h = s.height
+    gz, gx = np.gradient(h)
+    slope = np.degrees(np.arctan(np.hypot(gx, gz)))
+    peak_z, peak_x = np.unravel_index(int(h.argmax()), h.shape)
+    u, v = peak_x / (s.width - 1), peak_z / (s.depth - 1)
+    wet = ~np.isnan(s.water)
+    water = f"{wet.mean() * 100:.0f}% of columns under water" if wet.any() else "no water"
+    return (
+        f"area {s.width}x{s.depth} blocks; height y={h.min():.0f}..{h.max():.0f} (mean {h.mean():.0f}); "
+        f"highest point at (u={u:.2f}, v={v:.2f}); slope mean {slope.mean():.0f}°, max {slope.max():.0f}°; {water}"
+    )
+
+
+def op_diff(before: Sequence[OpEntry], after: Sequence[OpEntry]) -> list[str]:
+    """What changed between two op lists, one line per op: added, removed, or changed params (old -> new)."""
+    old, new = {e.id: e for e in before}, {e.id: e for e in after}
+    lines = [f"added {e.id}: {e.op}({e.params})" for e in after if e.id not in old]
+    lines += [f"removed {e.id} ({e.op})" for e in before if e.id not in new]
+    for e in after:
+        prev = old.get(e.id)
+        if prev is not None and prev.params != e.params:
+            keys = sorted(prev.params.keys() | e.params.keys())
+            changes = [f"{k} {prev.params.get(k)!r} -> {e.params.get(k)!r}" for k in keys if prev.params.get(k) != e.params.get(k)]
+            lines.append(f"changed {e.id}: " + ", ".join(changes))
+    return lines

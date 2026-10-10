@@ -1,6 +1,6 @@
 import pytest
 
-from agent.context import ContextManager, Episode
+from agent.context import ContextManager, Episode, RollbackFeedback
 from agent.critic import Critic, CriticError, CritiqueOutput, CritiqueResult
 from agent.session import Session
 from fakes import PEAK, ScriptedModel, critique_json, response, text
@@ -67,10 +67,13 @@ def test_episode_opening_message(session):
     ctx = ContextManager({"prompt": "a hill"}, area=(33, 33), references=[PNG])
     ctx.notes.append("keep it small")
     critique = CritiqueResult(verdict="revise", issues=[])
-    content = ctx.build_episode(session, "terrain", critique=critique, renders=[PNG], rolled_back_from=1.0).messages[0]["content"]
+    rollback = RollbackFeedback(round=2, why="blind comparison preferred the accepted attempt",
+                                diff=["changed raise_peak_1: height 15 -> 90"], problems=["[major] at raise_peak_1: a needle"])
+    content = ctx.build_episode(session, "terrain", critique=critique, renders=[PNG], rollback=rollback).messages[0]["content"]
     assert [b["type"] for b in content] == ["image", "text", "image"]  # references, text, renders
     body = content[1]["text"]
-    for fragment in ['"prompt": "a hill"', "raise_peak_1", "Verdict: revise", "rolled back", "keep it small"]:
+    for fragment in ['"prompt": "a hill"', "raise_peak_1", "Verdict: revise", "Round 2 was not kept: blind comparison",
+                     "height 15 -> 90", "a needle", "keep it small"]:
         assert fragment in body
 
 

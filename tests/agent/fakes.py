@@ -8,7 +8,8 @@ from typing import Any
 
 from agent.models import ModelConfig, ModelResponse, Usage
 
-PEAK = {"center": [0.5, 0.5], "radius": 0.25, "height": 40}
+# Low enough for the programmatic checks: a 40-block cone on a 33-wide area ends in a 1-2 block needle.
+PEAK = {"center": [0.5, 0.5], "radius": 0.25, "height": 15}
 
 
 def text(t: str) -> Any:
@@ -32,6 +33,11 @@ def critique_json(score: int, verdict: str = "revise") -> ModelResponse:
         "scores": {k: score for k in ["prompt_adherence", "layout", "naturalism", "minecraft_quality"]} | {"reference_match": None},
         "verdict": verdict,
     }
+    return response(text(json.dumps(body)))
+
+
+def compare_json(better: str, why: str = "fewer artifacts") -> ModelResponse:
+    body = {"strengths_1": "a", "strengths_2": "b", "better": better, "why": why}
     return response(text(json.dumps(body)))
 
 

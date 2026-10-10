@@ -60,14 +60,16 @@ Sessions: name the item at the start; check it off and commit when done.
 
 ### M4. Critic and acceptance (§11)
 
-- [ ] Programmatic checks (§11.2 MVP list)
-- [ ] Critic: rubric, fresh context, strict JSON output, located issues with fix hints;
+- [x] Programmatic checks (§11.2 MVP list)
+- [x] Critic: rubric, fresh context, strict JSON output, located issues with fix hints;
       `CriticError` → retry once, then record a failed round instead of crashing
-- [ ] Acceptance gate: objective rollback rules + blind comparison (§11.4), rollback feedback with the op
-      diff, run ends on the latest accepted attempt
-- [ ] Gate validation: trace script for revision and position win rates; broken-copy test in both orders
-- [ ] Feature attributes v1 (§4.2): slope class, sinuosity, summit, prominence, reaches-edge; category
+- [x] Acceptance gate: objective rollback rules + blind comparison (§11.4), rollback feedback with the op
+      diff, run ends on the latest accepted attempt (rule 2, the checklist pass count, comes with M5)
+- [x] Gate validation: trace script for revision and position win rates; broken-copy test in both orders
+- [x] Feature attributes v1 (§4.2): slope class, sinuosity, summit, prominence, reaches-edge; category
       functions shared with M5 and M6
+      Gap: `meander` tops out at sinuosity ~1.12–1.20, never "twisty" or "meandering" (DESIGN §4.2); recalibrate
+      before M5.
 - [ ] (Optional) tool catalogue in the critic prompt (§11.5)
 
 ### M5. Spec and reference images (§9.3, §11.3, §12)

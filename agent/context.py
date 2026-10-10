@@ -45,6 +45,25 @@ class Episode:
     messages: list[dict[str, Any]] = field(default_factory=list)
 
 
+@dataclass(frozen=True)
+class RollbackFeedback:
+    """Why the acceptance gate rejected the last revision and what it had changed (DESIGN §11.4 step 4)."""
+
+    round: int
+    why: str
+    diff: list[str]  # op_diff(accepted, rejected): what the rejected revision changed, now undone
+    problems: list[str]  # the rejected attempt's critic issues and failed checks
+
+    def as_text(self) -> str:
+        lines = [f"# Your last revision was rolled back\nRound {self.round} was not kept: {self.why}"]
+        if self.diff:
+            lines.append("What that revision changed (now undone):\n" + "\n".join(f"- {d}" for d in self.diff))
+        if self.problems:
+            lines.append("Problems found in it:\n" + "\n".join(f"- {p}" for p in self.problems))
+        lines.append("You are back on the last accepted terrain, described above. Try a different fix.")
+        return "\n\n".join(lines)
+
+
 class ContextManager:
     def __init__(
         self,
@@ -92,10 +111,11 @@ class ContextManager:
         stage: str,
         critique: CritiqueResult | None = None,
         renders: list[bytes] | None = None,
-        rolled_back_from: float | None = None,
+        rollback: RollbackFeedback | None = None,
         continuing: bool = False,
     ) -> Episode:
-        """Opening message: references, task, spec, terrain state, critique, notes, latest renders."""
+        """Opening message: references, task, spec, terrain state, critique (of the accepted terrain), rollback
+        feedback, notes, latest renders."""
         parts = [f"# Task\nStage: {stage}. Build this stage of the terrain described by the spec."]
         if continuing:
             parts.append("This continues earlier work in this stage; the previous conversation was closed to save context. "
@@ -104,9 +124,9 @@ class ContextManager:
         parts.append(f"# Current terrain\n{session.stats()}\n\nOps so far:\n{session.summary()}")
         if critique is not None:
             parts.append("# Critique of the current terrain\n" + critique.as_text())
-            if rolled_back_from is not None:
-                parts.append(f"Your last revision scored {rolled_back_from:.2f}, lower than this best attempt "
-                             f"({critique.score:.2f}), so it was rolled back. Try a different fix.")
+        if rollback is not None:
+            parts.append(rollback.as_text())
+        if critique is not None:
             parts.append("Address the issues above, most severe first.")
         if self.notes:
             parts.append("# Your notes\n" + "\n".join(f"- {n}" for n in self.notes))
