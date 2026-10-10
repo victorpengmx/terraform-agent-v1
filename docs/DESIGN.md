@@ -140,16 +140,18 @@ tool parameters against the categories (e.g. `meander` → sinuosity class) and 
 - Limitation: overlapping footprints share measurements. A whole-area seafloor reports the island on it,
   and island and volcano report one summit. The dominant-feature map (§4.3) fixes this later.
 
-**`meander` → sinuosity (mean of 5 seeds; the same at 128 and 256 blocks):**
+**`meander` → winding category (M4.5).** Bends repeat about every 12 channel widths (at least 24 blocks,
+at most half the path) and swing 0.45 × meander wavelengths; they fade in over half a wavelength at each
+end. Measured over 48 cases (128 and 256 blocks; widths 0.015, 0.03, 0.06; straight and bent paths; 4
+seeds):
 
-| meander | 0 | 0.2 | 0.4 | 0.6 | 0.8 | 1.0 |
-|---|---|---|---|---|---|---|
-| straight 2-point path | 1.00 | 1.01 | 1.02 | 1.05 | 1.08 | 1.12 |
-| 3-point bent path | 1.08 | 1.08 | 1.10 | 1.12 | 1.16 | 1.20 |
+| meander | 0.2 | 0.3 | 0.5 | 0.6 | 0.8 | 0.9 | 1.0 |
+|---|---|---|---|---|---|---|---|
+| category, cases | half almost straight, half winding | winding 48/48 | winding 21, twisty 27 | twisty 46/48 | meandering 33, twisty 15 | meandering 44/48 | meandering 48/48 |
 
-`meander` alone never reaches "twisty" (1.25) or "meandering" (1.5); only path points bend a river that
-far. The scale is miscalibrated against the categories (§5.9) and needs recalibrating before the M5
-checklist asks for those classes.
+The tool description says 0.3 = winding, 0.6 = twisty, 0.9–1 = meandering. Short rivers measure less:
+bends need room, so a river over half the area at 0.5 measures ~1.15–1.2. The old model (bends spanning the
+whole path, amplitude from width and length) topped out at 1.08–1.30 for meander 1.0.
 
 ### 4.3 Feature ↔ op mapping and overlaps [MVP v1 mapping; rest Later]
 
@@ -268,7 +270,8 @@ gaussian), combined by `blend(height, value, weight, mode)` with modes `add`, `m
   warp + terrace + banded palette; terracing a creek's slope before carving gives stepped pools.
 
 **Water** (invariants in code, not left to the model)
-- `carve_river(path, width, depth, meander)`: the bed is the running minimum of (ground − depth) along the
+- `carve_river(path, width, depth, meander)` (meander: bends about every 12 channel widths, calibrated to the
+  winding categories in §4.2): the bed is the running minimum of (ground − depth) along the
   path, so it never rises and cuts gorges through ridges. The path must end at the area edge or existing
   water, else an error. **Lay water out in whole blocks** (bed floored, surface ≥ 1 block above, submerged
   columns a full block under the surface) and contain it against the banks *as the compiler will round
@@ -589,8 +592,10 @@ GPT-4V's referring-expression accuracy on RefCOCOg from 25.7 to 86.4. We control
 - **Fresh context:** never sees the builder's conversation. Inputs: spec, references, renders, terrain
   stats, condensed op list, programmatic check results.
 - **Programmatic checks first** (cheap, objective); blocking failures skip the model call.
-- Rubric 1–5 with level descriptions: prompt_adherence, layout, naturalism, minecraft_quality,
-  reference_match (null without references). Structured output (strict JSON schema), issues before scores
+- Rubric 1–5 with level descriptions: prompt_adherence, layout, naturalism, minecraft_quality, materials
+  (surface blocks suit each landform and the spec and vary naturally; judged in the 3D render; added in
+  M4.5), reference_match (null without references). The critic also sees the palette in use, and the
+  catalogue gives the rule format, so material fixes are complete `set_palette_rules` calls. Structured output (strict JSON schema), issues before scores
   so the model reasons before rating. Each issue is located (op id or u,v) with a concrete fix hint naming
   a tool and parameter. Verdict "pass" only with no major issues and all scores ≥ 4.
 - The critic judges and suggests; the builder decides and acts. Accept/rollback lives in the harness.

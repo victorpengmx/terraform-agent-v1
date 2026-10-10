@@ -67,8 +67,6 @@ Sessions: name the item at the start; check it off and commit when done.
 - [x] Gate validation: trace script for revision and position win rates; broken-copy test in both orders
 - [x] Feature attributes v1 (§4.2): slope class, sinuosity, summit, prominence, reaches-edge; category
       functions shared with M5 and M6
-      Gap: `meander` tops out at sinuosity ~1.12–1.20, never "twisty" or "meandering" (DESIGN §4.2); recalibrate
-      before M5.
 - [x] (Optional) tool catalogue in the critic prompt (§11.5), with structured, schema-checked fixes
 
 ### M4.5 Tool quality pass (findings from the M3/M4 runs)
@@ -77,10 +75,11 @@ Sessions: name the item at the start; check it off and commit when done.
 - [x] Cliff palette: rock patches instead of bands by default, threshold 60°, soft slope limits
       (`slope_fuzz`) so moderate slopes are a grass/gravel/stone patchwork
 - [ ] Optional: elongated rock streaks (veins across a face, scree chutes downhill) as a `mix` option
-- [ ] `meander` recalibrated so rivers can reach "twisty" and "meandering" (DESIGN §4.2 table)
+- [x] `meander` recalibrated so rivers can reach "twisty" and "meandering" (DESIGN §4.2 table)
 - [ ] Seeded defaults with variation for omitted shape parameters
 - [x] `region` polygons include their edges on every side (whole-area polygons missed east-edge columns)
-- [ ] Critic: materials in the rubric; a second L2 angle (`overview_ne`) for critique and comparison
+- [x] Critic: materials in the rubric
+- [ ] Critic: a second L2 angle (`overview_ne`) for critique and comparison
 - [x] Critic: a separate `op_id` field for update_op/remove_op fixes
 
 ### M5. Spec and reference images (§9.3, §11.3, §12)

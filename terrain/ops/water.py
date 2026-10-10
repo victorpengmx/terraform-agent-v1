@@ -32,16 +32,28 @@ def densify(points: np.ndarray, step: float = SAMPLE_STEP) -> np.ndarray:
     return np.array(out)
 
 
-def meander(points: np.ndarray, amplitude: float, seed: int) -> np.ndarray:
-    """Displace a dense polyline sideways with smooth seeded waves; the endpoints stay fixed."""
+# Meanders (calibration: DESIGN §4.2, EVIDENCE 2026-10-23). Bends repeat every BEND_WAVELENGTH channel widths
+# (natural rivers: ~10-14), at least MIN_WAVELENGTH blocks and at most half the path; meander sets how far
+# they swing: amplitude = BEND_AMPLITUDE[0] * meander ** BEND_AMPLITUDE[1] wavelengths.
+BEND_WAVELENGTH = 12.0
+MIN_WAVELENGTH = 24.0
+BEND_AMPLITUDE = (0.45, 1.0)
+
+
+def meander(points: np.ndarray, amplitude: float, wavelength: float, seed: int) -> np.ndarray:
+    """Displace a dense polyline sideways with smooth seeded bends of about `wavelength` blocks; the bends
+    fade in and out over half a wavelength at each end, so the endpoints stay fixed."""
     seg = np.hypot(*np.diff(points, axis=0).T)
-    s = np.concatenate([[0.0], np.cumsum(seg)]) / max(seg.sum(), 1e-9)
+    s = np.concatenate([[0.0], np.cumsum(seg)])  # blocks along the path
     tangent = np.gradient(points, axis=0)
     tangent /= np.maximum(np.hypot(*tangent.T), 1e-9)[:, None]
     normal = np.stack([-tangent[:, 1], tangent[:, 0]], axis=1)
-    rng = np.random.default_rng(seed)
-    waves = sum(np.sin(2 * np.pi * f * s + rng.uniform(0, 2 * np.pi)) / k for k, f in enumerate((1.3, 2.9, 5.1), start=1))
-    offset = amplitude * np.sin(np.pi * s) * waves / np.abs(waves).max(initial=1e-9)
+    phase = np.random.default_rng(seed).uniform(0, 2 * np.pi, 3)
+    # A main bend plus two weaker ones, so bends differ in size and spacing instead of repeating exactly.
+    waves = (np.sin(2 * np.pi * s / wavelength + phase[0]) + 0.35 * np.sin(2 * np.pi * s / (0.55 * wavelength) + phase[1])
+             + 0.25 * np.sin(2 * np.pi * s / (1.8 * wavelength) + phase[2]))
+    t = np.clip(np.minimum(s, s[-1] - s) / (0.5 * wavelength), 0.0, 1.0)
+    offset = amplitude * (t * t * (3.0 - 2.0 * t)) * waves / np.abs(waves).max(initial=1e-9)
     return points + normal * offset[:, None]
 
 
@@ -96,7 +108,8 @@ class CarveRiverParams(OpParams):
     )
     width: float = Field(gt=0.0, le=0.25, description="Water width as a fraction of the shorter side.")
     depth: float = Field(default=4.0, ge=2.0, le=24.0, description="Channel depth in blocks below the land it cuts through.")
-    meander: Norm = Field(default=0.0, description="0 = follows the path exactly, 1 = strongly winding.")
+    meander: Norm = Field(default=0.0, description="How much the river bends between the path points: 0 = follows "
+                          "the path, 0.3 = winding, 0.6 = twisty, 0.9-1 = meandering loops.")
 
 
 @register_op("carve_river", params=CarveRiverParams, stage="water")
@@ -161,7 +174,9 @@ def river_centerline(state: WorldState, p: CarveRiverParams) -> np.ndarray:
     if p.meander > 0:
         half = max(length_to_blocks(state, p.width) / 2, 1.0)
         path_len = len(pts) * SAMPLE_STEP
-        pts = meander(pts, amplitude=p.meander * (3 * half + 0.05 * path_len), seed=state.seed)
+        wavelength = min(max(BEND_WAVELENGTH * 2 * half, MIN_WAVELENGTH), path_len / 2)
+        amplitude = BEND_AMPLITUDE[0] * p.meander ** BEND_AMPLITUDE[1] * wavelength
+        pts = meander(pts, amplitude=amplitude, wavelength=wavelength, seed=state.seed)
         pts[:, 0] = np.clip(pts[:, 0], 0, state.width - 1)
         pts[:, 1] = np.clip(pts[:, 1], 0, state.depth - 1)
     return pts

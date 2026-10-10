@@ -154,3 +154,37 @@ def test_shallow_river_water_survives_compile_along_its_whole_length(depth):
     dist, t = path_distance(s, creek)
     for a in np.linspace(0, 0.8, 5):  # water all the way from source to mouth
         assert compiled[(dist < 1.0) & (t >= a) & (t < a + 0.2)].mean() > 0.8  # along the centre line
+
+
+# ---------------------------------------------------------------- meander calibration (DESIGN §4.2)
+
+
+def _sinuosity(meander, width=0.03, size=256, seed=0):
+    from terrain.features import river_sinuosity
+    from terrain.opstack import BaseSpec, OpEntry, OpStack
+
+    entry = OpEntry("river", "carve_river", {"path": [[0.5, 0.0], [0.5, 1.0]], "width": width, "depth": 4.0, "meander": meander})
+    return river_sinuosity(OpStack(BaseSpec(size, size, seed=seed)), entry)
+
+
+@pytest.mark.parametrize("meander, category", [(0.0, "almost straight"), (0.3, "winding"), (0.6, "twisty"), (1.0, "meandering")])
+def test_meander_reaches_each_winding_category(meander, category):
+    from terrain.features import WINDING_CLASSES, category_distance, classify
+
+    got = [classify(_sinuosity(meander, seed=seed), WINDING_CLASSES) for seed in range(4)]
+    # Most seeds hit the stated category; none is off by more than the one category of slack checks allow.
+    assert got.count(category) >= 3 and all(category_distance(category, c, WINDING_CLASSES) <= 1 for c in got), got
+
+
+def test_meander_keeps_the_endpoints_and_scales_bends_with_width():
+    from terrain.ops.water import CarveRiverParams, river_centerline
+
+    s = WorldState.flat(256, 256, base_y=80, seed=1)
+
+    def line(width):
+        return river_centerline(s, CarveRiverParams(path=[[0.5, 0.0], [0.5, 1.0]], width=width, depth=4, meander=0.6))
+
+    narrow, wide = line(0.02), line(0.08)
+    assert np.allclose(narrow[0], [127.5, 0]) and np.allclose(narrow[-1], [127.5, 255])
+    turns = lambda pts: int((np.diff(np.sign(np.diff(pts[:, 0]))) != 0).sum())  # noqa: E731  (east-west reversals)
+    assert turns(narrow) > turns(wide)  # bends repeat every ~12 channel widths

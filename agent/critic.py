@@ -81,6 +81,7 @@ class RubricScores(_Strict):
     layout: Score
     naturalism: Score
     minecraft_quality: Score
+    materials: Score
     reference_match: Score | None = Field(description="null when there is no reference image")
 
 
@@ -178,6 +179,14 @@ def run_checks(session: Session) -> list[CheckResult]:
     return checks
 
 
+def _palette_text(state: WorldState) -> str:
+    from terrain.materials import DEFAULT_RULES
+
+    rules = state.palette_rules if state.palette_rules is not None else [r.model_dump(mode="json", exclude_none=True) for r in DEFAULT_RULES]
+    label = "custom" if state.palette_rules is not None else "default"
+    return f"{label}: " + json.dumps(rules, separators=(",", ":"))
+
+
 def _neighbours(a: np.ndarray) -> np.ndarray:
     p = np.pad(a, 1, mode="edge")
     return np.stack([p[:-2, 1:-1], p[2:, 1:-1], p[1:-1, :-2], p[1:-1, 2:]])
@@ -227,6 +236,11 @@ deliberate and balanced.
 spacing), 3 = plausible, 5 = convincing.
 - minecraft_quality: block-scale quality: no spikes, no floating water, walkable transitions where \
 expected. 1 = broken, 3 = minor artifacts, 5 = clean.
+- materials: the surface blocks, judged in the 3D render: do they suit each landform and the spec (rock \
+where it is steep or high, soil and grass where it is gentle, sand or gravel at water), and do they vary \
+naturally? 1 = wrong or one block everywhere, 3 = plausible with artifacts (rings or stripes of one block, \
+bare stone walls, abrupt switches at one slope), 5 = convincing. Fix materials with set_palette_rules or \
+paint_region.
 - reference_match: similarity to the reference images; null if there are none.
 
 3 means acceptable. Reserve 5 for results you would show as a showcase. Locate every issue with an op id \
@@ -258,12 +272,25 @@ def tool_catalogue() -> str:
         shared = [k for k in spec.params.model_fields if k in CHARACTER_FIELDS]
         params = ", ".join(_param_text(k, schema["properties"][k], schema) for k in own + shared)
         lines.append(f"- {spec.name}({params}): {_first_sentence(spec.description)}")
+        if spec.name == "set_palette_rules":
+            lines.append(_palette_syntax())
     lines += ["- update_op(id, params): change parameters of an existing op by id; the op keeps its other values.",
               "- remove_op(id): remove an op and its effect.",
               "character presets set roughness and steepness: gentle, rolling, rugged, jagged. A region is "
               '{"circle": {"center", "radius"}}, {"polygon": [[u, v], ...]}, {"path": {"points", "width"}} or '
               '{"feature": "<op id>"}.']
     return "\n".join(lines)
+
+
+def _palette_syntax() -> str:
+    """The rule format, generated from the materials models, so palette fixes can be written as valid rules."""
+    from terrain.materials import Condition
+
+    conds = ", ".join(Condition.model_fields)
+    return ('  rules is the WHOLE new palette (it replaces the current one), first match wins: a list of '
+            '{"when": {<any of ' + conds + '>}, "use": {"kind": "single", "block": B} | {"kind": "mix", '
+            '"blocks": {B: weight, ...}, "patch_size"} | {"kind": "banded", "blocks": [B, ...], "band_min", '
+            '"band_max", "noise"}, "subsurface": B}; end with a rule without "when". Slopes in degrees, y in blocks.')
 
 
 def _param_text(name: str, prop: dict, schema: dict) -> str:
@@ -348,6 +375,7 @@ class Critic:
             f"# Terrain statistics\n{session.stats()}",
             f"# Features (measured by code)\n{feature_report(measure_features(session.stack))}",
             f"# Ops applied\n{session.summary()}",
+            "# Surface palette in use (set_palette_rules replaces all of it)\n" + _palette_text(session.state),
             "# Programmatic checks\n" + "\n".join(f"- {c.name}: {'pass' if c.passed else 'FAIL'} ({c.detail})" for c in checks),
         ]
         if references:
