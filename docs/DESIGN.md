@@ -520,7 +520,7 @@ a budget stop or crash.
 | Level | Content | Cost | When |
 |---|---|---|---|
 | L1 [MVP] | top-down map: hillshade, land tint, water depth, contours, 0.1 (u, v) grid, north arrow, scale bar | ms | round start, critique, `render_view(map)` |
-| L2 [MVP] | voxel preview of the compiled blocks | seconds | round start and critique (optional), `render_view(3d)`, final save |
+| L2 [MVP] | voxel preview of the compiled blocks | seconds | round start, critique and blind comparison (default; `--render l1` to skip), `render_view(3d)`, final save |
 | L3 [Later] | real Minecraft render | slow | milestones, final critique |
 
 Text alongside images: terrain stats, condensed op list, per-feature stats (later counts and measured

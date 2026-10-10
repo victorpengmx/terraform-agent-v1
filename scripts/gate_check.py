@@ -56,7 +56,7 @@ def main() -> None:
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--model", default="claude-haiku-5-5")
     ap.add_argument("--effort", default="high")
-    ap.add_argument("--render", choices=["l1", "l2"], default="l1")
+    ap.add_argument("--render", choices=["l1", "l2"], default="l2")  # same default as agent.run
     args = ap.parse_args()
     load_dotenv(ENV_FILE, override=False)
     sys.stdout.reconfigure(encoding="utf-8", errors="replace")

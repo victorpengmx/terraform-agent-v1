@@ -16,7 +16,7 @@ Sessions: name the item at the start; check it off and commit when done.
 - [x] Amulet hello-world: write a 64×64 sine-wave hill into a closed flat 26.3 world; check in game
       (`HelloFlat_hello` exists; the Amulet backend tests run against it)
 - [x] Verify 26.3 height limits in game; set `terrain/config.py` (result recorded there)
-- [ ] First commit; push to a (private for now) GitHub repo
+- [x] First commit; push to a (private for now) GitHub repo
 
 ### M1. Canvas and core ops, no LLM (§3, §4.1, §5)
 
