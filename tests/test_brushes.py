@@ -58,3 +58,21 @@ def test_smooth_blend_reduces_variance():
 def test_feature_mask_unknown(state):
     with pytest.raises(KeyError, match="unknown feature 'x'"):
         b.feature_mask(state, "x")
+
+
+WHOLE = [[0, 0], [1, 0], [1, 1], [0, 1]]
+
+
+@pytest.mark.parametrize("width, depth", [(65, 65), (192, 192), (256, 256), (100, 60)])
+def test_whole_area_polygon_covers_every_column(width, depth):
+    s = WorldState.flat(width, depth)
+    assert b.polygon_inside(s, WHOLE).all()
+    assert (b.polygon_distance(s, WHOLE) <= 0).all()
+
+
+def test_polygon_edges_count_on_every_side(state):
+    square = [[0.25, 0.25], [0.75, 0.25], [0.75, 0.75], [0.25, 0.75]]  # edges on block columns 16 and 48
+    inside = b.polygon_inside(state, square)
+    assert inside.sum() == 33 * 33
+    assert inside[16, 16] and inside[48, 48] and inside[16, 48] and inside[48, 16]
+    assert not inside[15, 32] and not inside[49, 32] and not inside[32, 15] and not inside[32, 49]

@@ -16,7 +16,7 @@ Sessions: name the item at the start; check it off and commit when done.
 - [x] Amulet hello-world: write a 64×64 sine-wave hill into a closed flat 26.3 world; check in game
       (`HelloFlat_hello` exists; the Amulet backend tests run against it)
 - [x] Verify 26.3 height limits in game; set `terrain/config.py` (result recorded there)
-- [ ] First commit; push to a (private for now) GitHub repo
+- [x] First commit; push to a (private for now) GitHub repo
 
 ### M1. Canvas and core ops, no LLM (§3, §4.1, §5)
 
@@ -54,9 +54,8 @@ Sessions: name the item at the start; check it off and commit when done.
 - [x] Context manager: episodes built from state, rotation, pinned scratchpad, byte-stable prefix
 - [x] Tracing with run header; final op stack and renders saved (also on budget stop or crash)
 - [x] Guardrail: max changed volume per call (§5.8)
-- [ ] Milestone: prompt → Haiku build → compiled world, checked in game
-      Built and compiled (`traces/20261022-133743-e5a431.jsonl`, `TerraformTest` at x=900, z=0);
-      waiting for the in-game check.
+- [x] Milestone: prompt → Haiku build → compiled world, checked in game
+      (`traces/20261022-133743-e5a431.jsonl`, `TerraformTest` at x=900, z=0)
 
 ### M4. Critic and acceptance (§11)
 
@@ -71,6 +70,17 @@ Sessions: name the item at the start; check it off and commit when done.
       Gap: `meander` tops out at sinuosity ~1.12–1.20, never "twisty" or "meandering" (DESIGN §4.2); recalibrate
       before M5.
 - [ ] (Optional) tool catalogue in the critic prompt (§11.5)
+
+### M4.5 Tool quality pass (findings from the M3/M4 runs)
+
+- [x] `carve_valley` cross-section: talus toe, rounded shoulder, steepness/roughness via `character`
+- [x] Cliff palette: rock patches instead of bands by default, threshold 60°, soft slope limits
+      (`slope_fuzz`) so moderate slopes are a grass/gravel/stone patchwork
+- [ ] Optional: elongated rock streaks (veins across a face, scree chutes downhill) as a `mix` option
+- [ ] `meander` recalibrated so rivers can reach "twisty" and "meandering" (DESIGN §4.2 table)
+- [ ] Seeded defaults with variation for omitted shape parameters
+- [x] `region` polygons include their edges on every side (whole-area polygons missed east-edge columns)
+- [ ] Critic: materials in the rubric; a second L2 angle (`overview_ne`) for critique and comparison
 
 ### M5. Spec and reference images (§9.3, §11.3, §12)
 

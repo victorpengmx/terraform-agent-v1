@@ -20,6 +20,7 @@ from terrain.opstack import BaseSpec, OpStack
 VALUES = (0.1, 0.3, 0.5, 0.7, 0.9)
 PEAK = {"center": [0.5, 0.5], "radius": 0.35, "height": 100}
 GROUND = ("ground", "noise_base", {"amplitude": 2, "feature_size": 0.3, "roughness": 0.3})
+VALLEY = {"path": [[0.45, 0.0], [0.55, 0.35], [0.45, 0.7], [0.5, 1.0]], "width": 0.3, "depth": 26, "profile": "u"}
 
 # name -> (scene ops before the swept op, swept op, its fixed params, swept param, values)
 SWEEPS: dict[str, tuple[list[tuple[str, str, dict[str, Any]]], str, dict[str, Any], str, tuple[Any, ...]]] = {
@@ -33,6 +34,12 @@ SWEEPS: dict[str, tuple[list[tuple[str, str, dict[str, Any]]], str, dict[str, An
         "erode", {"kind": "thermal"}, "strength", (None, *VALUES)),
     "erode_hydraulic_strength": (
         [GROUND, ("mountain", "raise_peak", PEAK)], "erode", {"kind": "hydraulic"}, "strength", (None, *VALUES)),
+    "carve_valley_steepness": (
+        [("plain", "raise_region", {"region": {"polygon": [[0, 0], [1, 0], [1, 1], [0, 1]]}, "height": 30, "edge": 0}), GROUND],
+        "carve_valley", VALLEY | {"roughness": 0.0}, "steepness", VALUES),
+    "carve_valley_character": (
+        [("plain", "raise_region", {"region": {"polygon": [[0, 0], [1, 0], [1, 1], [0, 1]]}, "height": 30, "edge": 0}), GROUND],
+        "carve_valley", VALLEY, "character", ("gentle", "rolling", "rugged", "jagged")),
 }
 
 

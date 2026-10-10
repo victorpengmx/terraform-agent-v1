@@ -145,3 +145,57 @@ def test_banded_strata_tilt_with_noise_and_stay_level_without():
     gz, gx = np.gradient(plane)
     assert np.allclose(np.hypot(gx, gz), MAX_BAND_DIP * 0.5)  # a plane with the promised dip
     assert not np.allclose(_dip(s, 0.5, seed=4), plane)  # direction varies with the seed
+
+
+# ---------------------------------------------------------------- soft slope limits (slope_fuzz)
+
+
+def ramp(deg: float, n: int = 129) -> WorldState:
+    """A plane rising east at a constant slope."""
+    s = WorldState.flat(n, n, base_y=64, seed=3)
+    s.height += (np.arange(n, dtype=np.float32) * np.tan(np.radians(deg)))[None, :]
+    return s
+
+
+ROCKY = Rule(when=Condition(slope_min=35, slope_fuzz=12), use=Single(block="tuff"))
+GRASS = Rule(use=Single(block="grass_block"))
+
+
+def test_slope_fuzz_splits_one_slope_into_large_patches():
+    blocks = resolve_surface(with_rules(ramp(30), ROCKY, GRASS)).column_block[8:-8, 8:-8]
+    rock = blocks == "tuff"
+    # 30° sits 5° below the limit; with ±12° of fuzz ~29% of the ground passes, in coherent patches.
+    assert 0.15 < rock.mean() < 0.45
+    from scipy.ndimage import label
+    assert label(rock)[1] < 40  # a few large patches, not speckle (113 x 113 columns)
+
+
+def test_without_fuzz_a_slope_below_the_limit_is_all_one_rule():
+    hard = Rule(when=Condition(slope_min=35), use=Single(block="tuff"))
+    assert np.all(resolve_surface(with_rules(ramp(30), hard, GRASS)).column_block[8:-8, 8:-8] == "grass_block")
+
+
+def test_slope_fuzz_is_deterministic_and_seeded():
+    a = resolve_surface(with_rules(ramp(30), ROCKY, GRASS)).column_block
+    b = resolve_surface(with_rules(ramp(30), ROCKY, GRASS)).column_block
+    other = ramp(30)
+    other.seed = 4
+    c = resolve_surface(with_rules(other, ROCKY, GRASS)).column_block
+    assert np.array_equal(a, b) and not np.array_equal(a, c)
+
+
+def test_default_palette_turns_to_rock_gradually_with_slope():
+    rock_blocks = ["stone", "andesite", "tuff", "gravel"]
+    shares = []
+    for deg in (20, 30, 40, 50, 60, 70, 80):
+        top = resolve_surface(ramp(deg)).column_block[8:-8, 8:-8]
+        shares.append(np.isin(top.astype(str), rock_blocks).mean())
+    assert shares == sorted(shares)  # more rock on steeper ground
+    assert all(0.05 < x < 0.95 for x in shares[1:5])  # 30-60°: a patchwork, never all grass or all rock
+    assert shares[-1] > 0.9
+
+
+def test_default_cliffs_are_patches_not_bands():
+    from terrain.materials import DEFAULT_RULES
+
+    assert not any(isinstance(r.use, Banded) for r in DEFAULT_RULES)

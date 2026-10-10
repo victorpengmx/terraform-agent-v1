@@ -9,8 +9,9 @@ or critic is also saved under renders/<run_id>/. When the run ends (also on a bu
 final op stack is saved to renders/<run_id>/stack.json with final_l1.png and final_l2_<view>.png next to it.
 Compile it with `python -m scripts.compile_world --world <dir> --stack renders/<run_id>/stack.json`.
 
---render l1 (default): top-down relief map per observation (fast). l2: adds a voxel preview of the compiled
-blocks (a few seconds each, needs PyVista). none: statistics only, and no render_view tool.
+--render l2 (default): top-down relief map plus a voxel preview of the compiled blocks per observation (a few
+seconds each, needs PyVista); the critic and the blind comparison need the 3D view to judge wall steepness,
+cross-sections and materials. l1: relief map only (fast). none: statistics only, and no render_view tool.
 With l1 or l2 the builder can also call render_view mid-round (512 px, saved as renders/<run_id>/view_NNN.png).
 """
 
@@ -52,7 +53,7 @@ def main() -> None:
     ap.add_argument("--base-y", type=float, default=64.0)
     ap.add_argument("--max-steps", type=int, default=Budget.max_steps)
     ap.add_argument("--max-cost", type=float, default=Budget.max_cost_usd, help="USD")
-    ap.add_argument("--render", choices=["l1", "l2", "none"], default="l1", help="images shown to builder and critic")
+    ap.add_argument("--render", choices=["l1", "l2", "none"], default="l2", help="images shown to builder and critic")
     ap.add_argument("--compare-both-orders", action="store_true",
                     help="acceptance gate judges both orders and needs agreement (2x comparison cost; Opus and eval runs)")
     args = ap.parse_args()

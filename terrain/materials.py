@@ -54,6 +54,7 @@ if set(BLOCK_LOOKS) != set(SURFACE_BLOCKS):
     raise RuntimeError(f"BLOCK_LOOKS must cover SURFACE_BLOCKS exactly; differs in {set(BLOCK_LOOKS) ^ set(SURFACE_BLOCKS)}")
 BLOCK_LOOKS_TEXT = "; ".join(f"{b}: {BLOCK_LOOKS[b]}" for b in SURFACE_BLOCKS)
 SLOPE_SMOOTHING = 1.5  # gaussian sigma (blocks) applied before measuring slope for palette rules
+FUZZ_PATCH = 0.06  # size of the patches over which slope_fuzz shifts a rule's slope limits (fraction of the shorter side)
 MAX_BAND_DIP = 0.12  # band tilt (blocks of rise per block) at noise=1, ~7°; strata dip, so cones don't show rings
 
 # Soil under organic surfaces; everything else continues as itself (then stone below).
@@ -74,6 +75,10 @@ class Condition(_Strict):
     y_max: float | None = Field(default=None, description="Surface block y.")
     water_dist_max: float | None = Field(default=None, ge=0, description="Blocks to the nearest water column (0 = under water).")
     feature: str | None = Field(default=None, description="Only inside this feature's footprint (op id, e.g. 'mountain_1').")
+    slope_fuzz: float | None = Field(
+        default=None, ge=0, le=30,
+        description="Degrees: the slope limits wander by up to this much in large patches, so ground near a limit is "
+        "partly this rule and partly the next (a 30° slope can be grass in one place and rock in another).")
 
 
 class Single(_Strict):
@@ -119,11 +124,16 @@ class Rule(_Strict):
 
 
 DEFAULT_RULES: tuple[Rule, ...] = (
-    # Muted strata only: bright bands (calcite) on a cone read as snow lines.
-    Rule(when=Condition(slope_min=50), use=Banded(blocks=["stone", "andesite", "stone", "tuff"])),
+    # Cliffs: patches of rock types, not bands (default bands drew rings on cones, EVIDENCE 2026-10-22). Soft
+    # limits: rock takes over gradually between ~50° and ~70°, and moderate slopes are a patchwork of grass,
+    # gravel and stone from ~23° up, so no slope is all one material at a hard threshold.
+    Rule(when=Condition(slope_min=60, slope_fuzz=10),
+         use=Mix(blocks={"stone": 0.55, "andesite": 0.22, "tuff": 0.13, "gravel": 0.10}, patch_size=0.04)),
     Rule(when=Condition(y_min=170), use=Mix(blocks={"snow_block": 0.75, "stone": 0.25})),
     Rule(when=Condition(water_dist_max=2), use=Mix(blocks={"sand": 0.5, "gravel": 0.3, "mud": 0.2})),
-    Rule(when=Condition(slope_min=35), use=Mix(blocks={"grass_block": 0.45, "coarse_dirt": 0.2, "stone": 0.35})),
+    Rule(when=Condition(slope_min=35, slope_fuzz=12),
+         use=Mix(blocks={"grass_block": 0.40, "coarse_dirt": 0.12, "stone": 0.25, "andesite": 0.10, "gravel": 0.13},
+                 patch_size=0.05)),
     Rule(use=Mix(blocks={"grass_block": 0.9, "podzol": 0.06, "coarse_dirt": 0.04}, patch_size=0.015)),
 )
 FALLBACK = Rule(use=Single(block="stone"))
@@ -172,7 +182,8 @@ def resolve_surface(state: WorldState) -> SurfacePlan:
 
     rule_index = np.full(shape, -1, dtype=int)
     for i, rule in enumerate(rules):
-        match = _matches(rule.when, state, slope, y, water_dist) & (rule_index < 0)
+        fuzz_seed = zlib.crc32(f"{state.seed}:fuzz:{i}".encode())
+        match = _matches(rule.when, state, slope, y, water_dist, fuzz_seed) & (rule_index < 0)
         rule_index[match] = i
 
     column_block = np.full(shape, "", dtype=object)
@@ -235,8 +246,10 @@ def _dip(state: WorldState, noise: float, seed: int) -> np.ndarray:
     return plane * MAX_BAND_DIP * noise
 
 
-def _matches(c: Condition, state: WorldState, slope: np.ndarray, y: np.ndarray, water_dist: np.ndarray) -> np.ndarray:
+def _matches(c: Condition, state: WorldState, slope: np.ndarray, y: np.ndarray, water_dist: np.ndarray, fuzz_seed: int = 0) -> np.ndarray:
     m = np.ones(state.height.shape, dtype=bool)
+    if c.slope_fuzz:  # shift this rule's view of the slope by up to ±slope_fuzz, in coherent patches
+        slope = slope + c.slope_fuzz * (2.0 * _patch_ranks(state, FUZZ_PATCH, fuzz_seed) - 1.0)
     if c.slope_min is not None:
         m &= slope >= c.slope_min
     if c.slope_max is not None:
@@ -256,10 +269,15 @@ def _matches(c: Condition, state: WorldState, slope: np.ndarray, y: np.ndarray, 
     return m
 
 
+def _patch_ranks(state: WorldState, patch_size: float, seed: int) -> np.ndarray:
+    """Smooth seeded noise rank-normalized to uniform [0, 1): coherent patches, every value equally likely."""
+    noise = fractal_noise(state, feature_size=patch_size, octaves=2, roughness=0.5, seed=seed)
+    return np.argsort(np.argsort(noise, axis=None)).reshape(noise.shape) / noise.size
+
+
 def _mix(state: WorldState, mix: Mix, seed: int) -> np.ndarray:
-    """Coherent patches: rank-normalize smooth noise to uniform [0, 1), then cut by cumulative weight."""
-    noise = fractal_noise(state, feature_size=mix.patch_size, octaves=2, roughness=0.5, seed=seed)
-    ranks = np.argsort(np.argsort(noise, axis=None)).reshape(noise.shape) / noise.size
+    """Coherent patches: uniform patch noise, then cut by cumulative weight."""
+    ranks = _patch_ranks(state, mix.patch_size, seed)
     names = list(mix.blocks)
     edges = np.cumsum([mix.blocks[n] for n in names]) / sum(mix.blocks.values())
     return np.array(names, dtype=object)[np.minimum(np.searchsorted(edges, ranks, side="right"), len(names) - 1)]

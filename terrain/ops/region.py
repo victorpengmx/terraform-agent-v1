@@ -17,8 +17,8 @@ import numpy as np
 from pydantic import Discriminator, Field, Tag
 from scipy.ndimage import distance_transform_edt
 
-from terrain.brushes import (circle_distance, edge_weight, feature_mask, length_to_blocks, path_distance, polygon_distance,
-                             polygon_inside, smooth_path, to_blocks)
+from terrain.brushes import (circle_distance, edge_weight, feature_mask, length_to_blocks, path_distance, path_wobble,
+                             polygon_distance, polygon_inside, smooth_path)
 from terrain.ops.registry import Norm, OpError, OpParams, Point
 from terrain.state import WorldState
 
@@ -114,14 +114,8 @@ def _path_signed_distance(state: WorldState, path: PathSpec) -> np.ndarray:
     """Signed distance to a smooth path whose half-width wobbles gently along its length."""
     points = smooth_path(state, path.points)
     dist, t = path_distance(state, points)
-    curve = np.array([to_blocks(state, p) for p in points])
-    length = float(np.hypot(*np.diff(curve, axis=0).T).sum())
     half = length_to_blocks(state, path.width) / 2
-    wavelength = max(6.0 * half, 12.0)  # blocks; long, gentle swells rather than jitter
-    phase = np.random.default_rng(state.seed).uniform(0.0, 2 * np.pi, 2)
-    s = t.astype(np.float64) * length
-    wobble = (np.sin(2 * np.pi * s / wavelength + phase[0]) + 0.5 * np.sin(2 * np.pi * s / (0.37 * wavelength) + phase[1])) / 1.5
-    return (dist - half * (1.0 + PATH_WOBBLE * wobble)).astype(np.float32)
+    return (dist - half * (1.0 + PATH_WOBBLE * path_wobble(state, points, t, half))).astype(np.float32)
 
 
 def region_weight(state: WorldState, region: Region | None, edge_blocks: float) -> np.ndarray:

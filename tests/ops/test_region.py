@@ -152,3 +152,12 @@ def test_region_schema_is_a_union_of_closed_objects(op):
     assert sorted(next(iter(m["properties"])) for m in members) == ["circle", "feature", "path", "polygon"]
     assert all(m["additionalProperties"] is False and len(m["required"]) == 1 for m in members)
     assert "polygon" not in schema["properties"] and "feature" not in schema["properties"]
+
+
+@pytest.mark.parametrize("size", [192, 256])
+def test_whole_area_raise_with_no_edge_reaches_every_column(size):
+    # At 192 blocks, 37 east-edge columns stayed at the base: the edge test was half-open and float32
+    # distances of 0 or 2e-7 decided which edge columns edge=0 still caught.
+    s = WorldState.flat(size, size, base_y=64)
+    out = apply_op(s, "raise_region", {"region": {"polygon": [[0, 0], [1, 0], [1, 1], [0, 1]]}, "height": 30, "edge": 0})
+    assert np.all(out.height == 94)

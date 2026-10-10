@@ -8,6 +8,8 @@ import pytest
 from terrain.ops import OpError, apply_op
 from terrain.noise import MIN_DETAIL_BLOCKS, detail_octaves
 from terrain.ops.erode import hydraulic_iterations, thermal_settings, thermal_step
+from terrain.ops.valleys import FLOOR, valley_profile
+from terrain.opstack import BaseSpec, OpStack
 from terrain.state import WorldState
 
 BASE = 64.0
@@ -119,6 +121,66 @@ def test_u_valley_has_flatter_floor_than_v():
     v = apply_op(flat(), "carve_valley", args | {"profile": "v"}).height[:, 32]
     u = apply_op(flat(), "carve_valley", args | {"profile": "u"}).height[:, 32]
     assert u[28] < v[28]  # 4 blocks off-centre, the U is still near full depth
+
+
+def _wall_slopes(profile, steepness):
+    """|d(depth share)/ds| across one wall, s from the floor line (0) to the rim (1)."""
+    s = np.linspace(0, 1, 2001)
+    return s, np.abs(np.gradient(valley_profile(s, profile, steepness), s))
+
+
+@pytest.mark.parametrize("profile", ["v", "u"])
+@pytest.mark.parametrize("steepness", [0.0, 0.6, 1.0])
+def test_valley_walls_have_a_talus_toe_a_steep_face_and_a_rounded_shoulder(profile, steepness):
+    s, slope = _wall_slopes(profile, steepness)
+    shape = valley_profile(s, profile, steepness)
+    assert shape[0] == 1.0 and shape[-1] == 0.0 and np.all(np.diff(shape) <= 1e-12)  # floor to rim, never rising
+    face = slope.max()
+    floor = FLOOR[profile]
+    wall = s >= floor
+    t = (s - floor) / (1 - floor)
+    # Shoulder and toe: the slope falls to zero at both ends, so the wall eases into the land without a crease
+    # and starts from a gentle apron.
+    for end in (t > 0.99, t < 0.01):
+        assert slope[wall & end].max() < 0.1 * face
+    for end in (t > 0.97, t < 0.03):
+        assert slope[wall & end].max() < 0.25 * face
+    assert 0.35 < t[slope.argmax()] < 0.5  # steepest a little below mid-wall: the shoulder is the broader end
+
+
+def test_steepness_concentrates_the_wall_into_a_steeper_face():
+    faces = [_wall_slopes("v", st)[1].max() for st in (0.0, 0.25, 0.6, 0.85, 1.0)]
+    assert faces == sorted(faces) and faces[-1] > 1.4 * faces[0]
+
+
+def test_u_valley_floor_is_flat_and_v_valley_is_not():
+    s = np.linspace(0, FLOOR["u"], 50)
+    assert np.all(valley_profile(s, "u", 0.6) == 1.0) and valley_profile(np.array([0.2]), "v", 0.6)[0] < 1.0
+
+
+def test_valley_meets_the_plain_without_a_crease():
+    plain = apply_op(flat(129), "raise_region", {"region": {"polygon": [[0, 0], [1, 0], [1, 1], [0, 1]]}, "height": 40, "edge": 0})
+    s = apply_op(plain, "carve_valley", {"path": [[0.5, 0], [0.5, 1]], "width": 0.5, "depth": 24, "profile": "u", "roughness": 0})
+    row = s.height[64]
+    rim = np.nonzero(row < row[0] - 0.01)[0][0]  # first column the valley lowers, from the west
+    # The first blocks below the rim drop gently: 1.2 blocks over 5 columns (the old 1 - s^4 profile: 11.8).
+    assert row[rim - 1] - row[rim + 4] < 3.0
+    assert row[64] == pytest.approx(row[0] - 24)
+
+
+def test_valley_character_resolves_into_the_op_stack():
+    stack = OpStack(BaseSpec(65, 65, base_y=BASE))
+    stack.add("carve_valley", {"path": [[0.5, 0], [0.5, 1]], "width": 0.3, "depth": 10, "character": "gentle"}, id="valley")
+    assert {"character": "gentle", "steepness": 0.25, "roughness": 0.2}.items() <= stack.get("valley").params.items()
+    stack.update("valley", {"character": "jagged"})
+    assert stack.get("valley").params["steepness"] == 0.85
+
+
+def test_roughness_makes_the_valley_widen_and_narrow_along_its_path():
+    def widths(roughness):
+        s = apply_op(flat(129), "carve_valley", {"path": [[0.5, 0], [0.5, 1]], "width": 0.3, "depth": 10, "roughness": roughness}, seed=7)
+        return (s.height < BASE - 0.5).sum(axis=1)[5:-5]  # carved columns per row, away from the ends
+    assert np.ptp(widths(0.0)) <= 1 and np.ptp(widths(0.8)) >= 6
 
 
 # ---------------------------------------------------------------- smooth

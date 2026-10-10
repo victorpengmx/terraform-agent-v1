@@ -202,7 +202,8 @@ region (omitted = whole area where allowed):
 edge: fade width beyond the region (fraction of the shorter side)
 ```
 
-One module builds a 0–1 weight from it on top of the brush helpers (§5.4). Used by **modifiers**:
+One module builds a 0–1 weight from it on top of the brush helpers (§5.4). Polygons include their edges on every side, so
+`[[0,0],[1,0],[1,1],[0,1]]` covers every column. Used by **modifiers**:
 `raise_region`, `smooth`, `warp`, `roughen`, `erode`, `paint_region`. Ops whose geometry is their
 definition keep their own parameters: `raise_peak` (center, radius), `carve_valley` and `carve_river`
 (path). Paths must be smoothed: raw polylines read as zigzags with hard edges. All of them use one
@@ -218,7 +219,7 @@ Catmull-Rom curve through the points (`brushes.smooth_path`). [Later] `exclude: 
 | rugged (default) | 0.55 | 0.60 |
 | jagged | 0.80 | 0.85 |
 
-On `noise_base` (roughness only), `raise_peak`, `terrace`, later `raise_ridge`. Each op maps the scales
+On `noise_base` (roughness only), `raise_peak`, `terrace`, `carve_valley`, later `raise_ridge`. Each op maps the scales
 onto its internals (e.g. `raise_peak`: steepness → profile sharpness; roughness → outline irregularity and
 radial gullies). **Calibration:** a sweep script renders each scale at 0.1 … 0.9; check by eye that 0.2
 reads gentle and 0.8 jagged; record the verdict in EVIDENCE.md. Default noise toward gentle: fine noise on
@@ -240,7 +241,14 @@ gaussian), combined by `blend(height, value, weight, mode)` with modes `add`, `m
   the summit height preserved.
 - `raise_region(region, height, mode: add | plateau | basin)`: raise or lower an area; negative height
   lowers; `basin` digs a flat floor below the outline's lowest point (always holds water).
-- `carve_valley(path, width, depth, profile: v | u)`: river-cut V or glacial U.
+- `carve_valley(path, width, depth, profile: v | u, character | steepness, roughness)`: river-cut V or glacial U
+  (flat floor over 30% of the half width).
+  - Walls are an S: a concave talus apron at the toe, the steepest point ~0.42 of the way up, and a broader
+    convex shoulder that eases into the land at the rim. The old U (`1 − s⁴`) was steepest exactly at the
+    rim and read as a ship hull.
+  - steepness concentrates the face: max wall slope 1.6× (0) to 2.5× (1) the wall's mean slope.
+  - roughness swells and narrows the width along the path (up to ±30%).
+  - Depth relative to width sets how steep the walls are overall; the tool description says so.
 - `smooth(region, strength)`.
 - `erode(kind: thermal | hydraulic, strength, region?)`:
   - thermal: slopes crumble toward a talus angle; strength maps to passes and angle together
@@ -296,13 +304,27 @@ validated, clean schema):
 ```
 
 - Conditions: `slope_min/max` (degrees, measured on a lightly smoothed surface so rock follows landforms
-  instead of speckling grassland at 1-block steps), `y_min/max`, `water_dist_max`, `feature`.
+  instead of speckling grassland at 1-block steps), `y_min/max`, `water_dist_max`, `feature`, and
+  `slope_fuzz` (degrees): the slope limits wander by up to that much in large coherent patches. Ground near
+  a limit is then partly one rule and partly the next, so a 30° slope can be grass in one place and rock in
+  another, instead of everything switching at one angle.
 - Blocks from a closed list of natural blocks, **each described by how it looks** ("granite: dull pinkish
   brown"), test-checked against a measured colour table. Models otherwise pick blocks from memory and get
   colours wrong.
 - `banded`: block by y + noise → strata; noise also tilts the strata slightly so bands on a cone don't
   form concentric rings. `mix`: weighted random with spatial noise → patches, not static.
+  The tilt is not enough on steep cones: default bands still read as rings (EVIDENCE 2026-10-22), so the
+  default palette has no bands. Keep `banded` for strata the prompt asks for (mesas, badlands).
 - Defaults exist; the model only overrides. `paint_region(region, block)` overrides rules locally.
+  The default palette (M4.5) has:
+  - cliffs: from 60° ± 10°, patches of stone, andesite, tuff and gravel
+  - snow: above y 170
+  - shores: within 2 blocks of water
+  - moderate slopes: from 35° ± 12°, large patches of grass, coarse dirt, stone, andesite and gravel
+  - grass: everywhere else
+
+  Rock share by slope on constant-slope ramps: 20° 0%, 30° 15%, 40° 34%, 50° 42%, 60° 68%, 70°+ 100%.
+  Before this change it jumped at 35° and 50°.
 - [Later] `apply_palette_preset(style)` (temperate, alpine, badlands, karst) if traces show long or invalid
   rule calls.
 
@@ -520,7 +542,7 @@ a budget stop or crash.
 | Level | Content | Cost | When |
 |---|---|---|---|
 | L1 [MVP] | top-down map: hillshade, land tint, water depth, contours, 0.1 (u, v) grid, north arrow, scale bar | ms | round start, critique, `render_view(map)` |
-| L2 [MVP] | voxel preview of the compiled blocks | seconds | round start and critique (optional), `render_view(3d)`, final save |
+| L2 [MVP] | voxel preview of the compiled blocks | seconds | round start, critique and blind comparison (default; `--render l1` to skip), `render_view(3d)`, final save |
 | L3 [Later] | real Minecraft render | slow | milestones, final critique |
 
 Text alongside images: terrain stats, condensed op list, per-feature stats (later counts and measured

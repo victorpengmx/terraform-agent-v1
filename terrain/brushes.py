@@ -53,6 +53,17 @@ def smooth_path(state: WorldState, points: Sequence[Sequence[float]]) -> list[tu
     return [tuple(q) for q in np.clip(curve / scale, 0.0, 1.0)]
 
 
+def path_wobble(state: WorldState, points: Sequence[Sequence[float]], t: np.ndarray, half_width: float) -> np.ndarray:
+    """Seeded smooth wobble in [-1, 1] along a path (t = arc-length parameter from `path_distance`): long,
+    gentle swells rather than jitter, so widths along a path vary naturally."""
+    curve = np.array([to_blocks(state, p) for p in points])
+    length = float(np.hypot(*np.diff(curve, axis=0).T).sum())
+    wavelength = max(6.0 * half_width, 12.0)  # blocks
+    phase = np.random.default_rng(state.seed).uniform(0.0, 2 * np.pi, 2)
+    s = t.astype(np.float64) * length
+    return (np.sin(2 * np.pi * s / wavelength + phase[0]) + 0.5 * np.sin(2 * np.pi * s / (0.37 * wavelength) + phase[1])) / 1.5
+
+
 # ---------------------------------------------------------------- distances and masks
 
 
@@ -86,8 +97,16 @@ def path_distance(state: WorldState, points: Sequence[Sequence[float]]) -> tuple
     return best_d.astype(np.float32), best_t.astype(np.float32)
 
 
+ON_EDGE = 1e-3  # blocks: a column this close to a polygon's edge counts as inside
+
+
 def polygon_inside(state: WorldState, points: Sequence[Sequence[float]]) -> np.ndarray:
-    """Boolean mask of columns inside a polygon (even-odd rule)."""
+    """Boolean mask of columns inside a polygon, edges included on every side.
+
+    The even-odd test alone is half-open: it keeps columns on the west and north edges but drops those on
+    the east and south ones, so a whole-area polygon missed its last column and row (and with edge=0,
+    float32 distances of 0 or 2e-7 decided column by column which of them a raise_region still touched).
+    """
     if len(points) < 3:
         raise ValueError("a polygon needs at least 3 points")
     xx, zz = block_grid(state)
@@ -99,11 +118,12 @@ def polygon_inside(state: WorldState, points: Sequence[Sequence[float]]) -> np.n
         crosses = (zz >= min(z1, z2)) & (zz < max(z1, z2))
         x_at = x1 + (zz - z1) * (x2 - x1) / (z2 - z1)
         inside ^= crosses & (xx < x_at)
-    return inside
+    edge, _ = path_distance(state, list(points) + [points[0]])
+    return inside | (edge <= ON_EDGE)
 
 
 def polygon_distance(state: WorldState, points: Sequence[Sequence[float]]) -> np.ndarray:
-    """Signed distance in blocks to a polygon's edge: negative inside, positive outside."""
+    """Signed distance in blocks to a polygon's edge: negative inside, positive outside (0 on the edge)."""
     edge, _ = path_distance(state, list(points) + [points[0]])
     return np.where(polygon_inside(state, points), -edge, edge)
 
