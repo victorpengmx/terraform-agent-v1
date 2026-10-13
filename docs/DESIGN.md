@@ -694,6 +694,17 @@ orders) must pick the intact one. Tools: `scripts/gate_stats.py` (win rates from
 - [MVP, optional] **Tool catalogue** in the critic's system prompt (one line per op: name, first sentence,
   parameter names; generated from the registry; cached). Fix hints then name real tools; count "no tool"
   hints as a ranked list of missing tools.
+  Implemented in M4 (`agent/critic.py`):
+  - **Catalogue** (`tool_catalogue`): every parameter is shown with its allowed values (`profile=v|u`) or
+    range (`width [0..1]`), plus `update_op`/`remove_op`, the character presets and the region shapes.
+  - **Structured fix:** each issue states its fix as `tool` (an op, `update_op`, `remove_op` or `"none"`) and
+    `changes` (param, JSON value), next to the free-text `fix_hint`. `update_op`/`remove_op`
+    fixes name their target in `op_id`; `location` stays an op id or a u,v position.
+  - **Validation:** `hint_problems` checks a fix against the schemas (tool, op id, parameter, value).
+  - **Builder:** the builder sees the structured fix after the hint.
+  - **Missing tools:** `scripts/missing_tools.py` ranks `"none"` issues across traces.
+  - **A/B:** `scripts/catalogue_ab.py` re-critiques saved runs with and without the catalogue (EVIDENCE
+    2026-10-23).
 - [Later] Annotated L1 (§10.4) so issues are located by feature id.
 - [Later] A different-family critic once a second adapter exists.
 

@@ -69,7 +69,7 @@ Sessions: name the item at the start; check it off and commit when done.
       functions shared with M5 and M6
       Gap: `meander` tops out at sinuosity ~1.12–1.20, never "twisty" or "meandering" (DESIGN §4.2); recalibrate
       before M5.
-- [ ] (Optional) tool catalogue in the critic prompt (§11.5)
+- [x] (Optional) tool catalogue in the critic prompt (§11.5), with structured, schema-checked fixes
 
 ### M4.5 Tool quality pass (findings from the M3/M4 runs)
 
@@ -81,6 +81,7 @@ Sessions: name the item at the start; check it off and commit when done.
 - [ ] Seeded defaults with variation for omitted shape parameters
 - [x] `region` polygons include their edges on every side (whole-area polygons missed east-edge columns)
 - [ ] Critic: materials in the rubric; a second L2 angle (`overview_ne`) for critique and comparison
+- [x] Critic: a separate `op_id` field for update_op/remove_op fixes
 
 ### M5. Spec and reference images (§9.3, §11.3, §12)
 

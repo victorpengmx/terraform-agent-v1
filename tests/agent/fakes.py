@@ -29,7 +29,8 @@ def response(*blocks: Any, stop: str = "end_turn", input_tokens: int = 100) -> M
 
 def critique_json(score: int, verdict: str = "revise") -> ModelResponse:
     body = {
-        "issues": [{"location": "raise_peak_1", "severity": "major", "description": "too round", "fix_hint": "raise sharpness"}],
+        "issues": [{"location": "raise_peak_1", "severity": "major", "description": "too round", "tool": "update_op", "op_id": "raise_peak_1",
+                    "changes": [{"param": "roughness", "value": "0.8"}], "fix_hint": "raise roughness"}],
         "scores": {k: score for k in ["prompt_adherence", "layout", "naturalism", "minecraft_quality"]} | {"reference_match": None},
         "verdict": verdict,
     }
