@@ -261,7 +261,7 @@ def _matches(c: Condition, state: WorldState, slope: np.ndarray, y: np.ndarray, 
     if c.water_dist_max is not None:
         m &= water_dist <= c.water_dist_max
     if c.feature is not None:
-        mask = state.masks.get(f"feature:{c.feature}")
+        mask = state.masks.get(f"feature:{c.feature}", state.masks.get(f"spec:{c.feature}"))
         if mask is None:
             m &= False  # unknown feature matches nothing; set_palette_rules validates names up front
         else:

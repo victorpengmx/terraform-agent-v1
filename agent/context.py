@@ -12,6 +12,7 @@ from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Any
 
 from agent.session import Session
+from agent.spec import spec_text
 from agent.tools import Tool, image_block, text_block
 from terrain.config import WORLD_MAX_Y, WORLD_MIN_Y
 
@@ -34,6 +35,8 @@ How to work:
 - If a tool returns an error, read it and change the parameters; do not repeat the same call.
 - Use write_note for decisions or progress worth remembering; notes survive when the conversation is \
 reset, chat history does not.
+- When the spec lists features, pass feature=<spec feature id> on every op that builds or shapes that \
+feature; a checklist measures each feature over the ops tagged with it.
 - If the request needs something no tool can express, say so instead of approximating silently.
 - When the stage is done, reply with a short summary and no tool call."""
 
@@ -120,7 +123,7 @@ class ContextManager:
         if continuing:
             parts.append("This continues earlier work in this stage; the previous conversation was closed to save context. "
                          "The state below includes everything done so far.")
-        parts.append("# Spec\n" + json.dumps(self.spec, indent=2, sort_keys=True))
+        parts.append("# Spec\n" + spec_text(self.spec))
         parts.append(f"# Current terrain\n{session.stats()}\n\nOps so far:\n{session.summary()}")
         if critique is not None:
             parts.append("# Critique of the current terrain\n" + critique.as_text())

@@ -25,6 +25,7 @@ class Session:
     def __init__(self, stack: OpStack, max_changed_volume: float | None = None) -> None:
         """`max_changed_volume`: guardrail on sum |Δh| per agent call (DESIGN §5.8); default from config."""
         self.stack = stack
+        self.spec_feature_ids: set[str] | None = None  # set by the harness when the run has a feature graph
         base = stack.base
         self.max_changed_volume = max_changed_volume if max_changed_volume is not None else MAX_MEAN_DH * base.width * base.depth
 
@@ -40,12 +41,22 @@ class Session:
     def ops(self) -> list[OpEntry]:
         return list(self.stack.entries)
 
-    def apply(self, op: str, params: dict[str, Any], id: str | None = None) -> OpEntry:
+    def apply(self, op: str, params: dict[str, Any], id: str | None = None, feature: str | None = None) -> OpEntry:
         """Add one op. Raises OpError (agent-facing) and leaves the session unchanged on failure."""
-        return self._guarded(lambda: self.stack.add(op, params, id=id))
+        self._check_feature(feature)
+        return self._guarded(lambda: self.stack.add(op, params, id=id, feature=feature))
 
     def update(self, op_id: str, params: dict[str, Any]) -> OpEntry:
-        return self._guarded(lambda: self.stack.update(op_id, params))
+        """`params` may include `feature` to retag the op (null clears the tag)."""
+        params = dict(params)
+        feature = params.pop("feature", ...)
+        if feature is not ...:
+            self._check_feature(feature)
+        return self._guarded(lambda: self.stack.update(op_id, params, feature=feature))
+
+    def _check_feature(self, feature: str | None) -> None:
+        if feature is not None and self.spec_feature_ids is not None and feature not in self.spec_feature_ids:
+            raise OpError(f"unknown spec feature {feature!r}; the spec's features are: {', '.join(sorted(self.spec_feature_ids))}")
 
     def remove(self, op_id: str) -> OpEntry:
         return self.stack.remove(op_id)  # undoing is never limited
@@ -75,7 +86,8 @@ class Session:
         """Compact text view of the op stack with each op's footprint, for observations and context."""
         if not len(self.stack):
             return "(no ops yet)"
-        return "\n".join(f"{e.id}: {e.op}({e.params}) -> {self.effect(e)}" for e in self.stack.entries)
+        return "\n".join(f"{e.id}{f' [feature={e.feature}]' if e.feature else ''}: {e.op}({e.params}) -> {self.effect(e)}"
+                         for e in self.stack.entries)
 
     def effect(self, e: OpEntry, detail: bool = False) -> str:
         """What an op changed: its footprint, or for materials-stage ops which surface blocks it sets.

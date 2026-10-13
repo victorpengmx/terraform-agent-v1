@@ -54,6 +54,8 @@ def main() -> None:
     ap.add_argument("--max-steps", type=int, default=Budget.max_steps)
     ap.add_argument("--max-cost", type=float, default=Budget.max_cost_usd, help="USD")
     ap.add_argument("--render", choices=["l1", "l2", "none"], default="l2", help="images shown to builder and critic")
+    ap.add_argument("--no-spec", action="store_true",
+                    help="skip the SPEC step: builder and critic get the raw prompt, no feature checklist (M6 ablation)")
     ap.add_argument("--compare-both-orders", action="store_true",
                     help="acceptance gate judges both orders and needs agreement (2x comparison cost; Opus and eval runs)")
     args = ap.parse_args()
@@ -86,6 +88,7 @@ def main() -> None:
             render=None if args.render == "none" else make_renderer(args.render, out_dir),
             max_rounds=args.rounds,
             compare_both_orders=args.compare_both_orders,
+            use_spec=not args.no_spec,
         )
         print(result)
     finally:
@@ -110,6 +113,7 @@ def run_header(args: argparse.Namespace, images: list[bytes], session: Session, 
         "effort": args.effort,
         "max_rounds": args.rounds,
         "compare_both_orders": args.compare_both_orders,
+        "spec": "none" if args.no_spec else "model",
         "render": args.render,
         "budget": {"max_steps": budget.max_steps, "max_cost_usd": budget.max_cost_usd, "max_seconds": budget.max_seconds},
         "canvas": {"width": base.width, "depth": base.depth, "base_y": base.base_y, "seed": base.seed},

@@ -72,7 +72,7 @@ def test_episode_opening_message(session):
     content = ctx.build_episode(session, "terrain", critique=critique, renders=[PNG], rollback=rollback).messages[0]["content"]
     assert [b["type"] for b in content] == ["image", "text", "image"]  # references, text, renders
     body = content[1]["text"]
-    for fragment in ['"prompt": "a hill"', "raise_peak_1", "Verdict: revise", "Round 2 was not kept: blind comparison",
+    for fragment in ["Request: a hill", "raise_peak_1", "Verdict: revise", "Round 2 was not kept: blind comparison",
                      "height 15 -> 90", "a needle", "keep it small"]:
         assert fragment in body
 

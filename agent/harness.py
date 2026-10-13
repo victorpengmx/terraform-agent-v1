@@ -22,9 +22,10 @@ from typing import Any, Callable, Literal
 
 from agent.budget import Budget, BudgetTracker
 from agent.context import ContextManager, Episode, RollbackFeedback
-from agent.critic import AttemptView, Critic, CriticError, CritiqueResult
+from agent.critic import AttemptView, Critic, CriticError, CritiqueResult, spec_checklist
 from agent.models import ModelAdapter, ModelResponse
 from agent.session import Session, Snapshot, op_diff, terrain_stats
+from agent.spec import FeatureGraph, SpecError, write_spec
 from agent.tools import Tool, execute, tool_result
 from agent.tracing import Tracer, TraceRecord
 from terrain.state import WorldState
@@ -46,6 +47,7 @@ class RunResult:
     score: float | None = None  # its mean rubric score, for reports only (never used to gate)
     cost_usd: float = 0.0
     summary: str = ""  # builder's final text
+    graph: FeatureGraph | None = None  # the spec's feature graph, if the run had one
 
     def __str__(self) -> str:
         kept = "n/a" if self.accepted_round is None else f"round {self.accepted_round} (score {self.score:.2f})"
@@ -96,20 +98,22 @@ def run_task(
     max_rounds: int = 3,
     stage: str = "terrain",
     compare_both_orders: bool = False,
+    graph: FeatureGraph | None = None,
+    use_spec: bool = True,
 ) -> RunResult:
-    spec = {"prompt": prompt}
+    """`graph`: a given feature graph (e.g. a hand-written one); otherwise, with `use_spec`, a SPEC call writes
+    one from the prompt and images. `use_spec=False` builds from the raw prompt (no checklist)."""
+    run = _Run(session=session, tools={}, tool_params=[], model=model, context=None, tracer=tracer,  # type: ignore[arg-type]
+               tracker=BudgetTracker(budget))
+    if use_spec and graph is None:
+        graph = _spec(run, prompt, images)
+    spec = {"prompt": prompt, "graph": graph if use_spec else None}
+    if spec["graph"] is not None:
+        session.spec_feature_ids = spec["graph"].ids()
     context = ContextManager(spec, area=(session.state.width, session.state.depth), references=images)
     tools = {**tools, "write_note": context.note_tool()}
-    run = _Run(
-        session=session,
-        tools=tools,
-        tool_params=[t.to_param() for t in tools.values()],
-        model=model,
-        context=context,
-        tracer=tracer,
-        tracker=BudgetTracker(budget),
-    )
-    result = RunResult(run_id=tracer.run_id, stop="", rounds=0, session=session)
+    run.tools, run.tool_params, run.context = tools, [t.to_param() for t in tools.values()], context
+    result = RunResult(run_id=tracer.run_id, stop="", rounds=0, session=session, graph=spec["graph"])
 
     accepted: Attempt | None = None
     rollback: RollbackFeedback | None = None
@@ -207,6 +211,25 @@ def run_stage(run: _Run, episode: Episode, stage: str, render: Renderer | None =
                 raise RuntimeError(f"unhandled stop_reason {other!r}")
 
 
+def _spec(run: _Run, prompt: str, images: list[bytes]) -> FeatureGraph | None:
+    """SPEC step (DESIGN §9.3): one call with the builder model, retried once; a second failure runs without
+    a graph rather than crashing."""
+    for attempt in (1, 2):
+        try:
+            graph, response = write_spec(run.model, prompt, images)
+        except SpecError as e:
+            if e.response is not None:
+                _charge(run, e.response)
+            _trace(run, "spec", e.response, note=f"SPEC failed (try {attempt} of 2): {e}")
+            continue
+        _charge(run, response)
+        _trace(run, "spec", response, scores={"graph": graph.model_dump(mode="json")},
+               note=f"feature graph: {len(graph.features)} features, {len(graph.relations)} relations")
+        return graph
+    _trace(run, "spec", note="SPEC failed twice; building from the raw prompt without a checklist")
+    return None
+
+
 def _critique(run: _Run, critic: Critic, spec: dict, stage: str, render: Renderer | None, references: list[bytes]) -> CritiqueResult:
     """Critique the current terrain. An unusable critic reply is retried once; a second failure records a
     failed round (programmatic checks only) instead of crashing the run."""
@@ -225,7 +248,8 @@ def _critique(run: _Run, critic: Critic, spec: dict, stage: str, render: Rendere
             _charge(run, response)
         _trace(run, f"{stage}/critique", response, scores=critique.model_dump(), note=f"score {critique.score:.2f}, {critique.verdict}")
         return critique
-    critique = CritiqueResult(checks=critic.run_checks(run.session), verdict="revise", failed=error)
+    critique = CritiqueResult(checks=critic.run_checks(run.session), checklist=spec_checklist(spec, run.session),
+                              verdict="revise", failed=error)
     _trace(run, f"{stage}/critique", scores=critique.model_dump(), note="critic failed twice; round recorded with checks only")
     return critique
 
@@ -236,7 +260,16 @@ def _gate(run: _Run, critic: Critic, spec: dict, stage: str, render: Renderer | 
     regressed = revision.critique.regressions(accepted.critique)
     if regressed:  # rule 1
         return False, "it fails checks the accepted attempt passed: " + "; ".join(f"{c.name} ({c.detail})" for c in regressed)
-    # Rule 2 (spec checklist pass count) arrives with the checklist in M5.
+    # Rule 2, symmetric (decided 2026-10-23): the spec checklist is objective evidence, so fewer passes roll
+    # back and more passes keep the revision without asking the comparison; equal passes go on to rule 3.
+    passes, before = revision.critique.checklist_passes, accepted.critique.checklist_passes
+    if accepted.critique.checklist and passes < before:
+        lost = revision.critique.checklist_losses(accepted.critique)
+        return False, (f"it passes {passes} spec checklist items, the accepted attempt {before}; no longer met: "
+                       + "; ".join(f"{i.text} ({i.detail})" for i in lost))
+    if accepted.critique.checklist and passes > before:
+        gained = revision.critique.checklist_gains(accepted.critique)
+        return True, f"it passes {passes} spec checklist items, the accepted attempt {before}; newly met: " + "; ".join(i.text for i in gained)
 
     # Rule 3: blind comparison in a seeded random order; only a win for the accepted attempt rolls back.
     previous = AttemptView(render(accepted.checkpoint.state, None) if render else [], terrain_stats(accepted.checkpoint.state))

@@ -129,11 +129,16 @@ def polygon_distance(state: WorldState, points: Sequence[Sequence[float]]) -> np
 
 
 def feature_mask(state: WorldState, feature_id: str) -> np.ndarray:
-    key = f"feature:{feature_id}"
-    if key not in state.masks:
-        known = sorted(k.removeprefix("feature:") for k in state.masks if k.startswith("feature:"))
-        raise KeyError(f"unknown feature {feature_id!r}; known features: {', '.join(known) or 'none'}")
-    return state.masks[key]
+    """Footprint of an op id, or of a spec feature id (the union of the ops tagged with it)."""
+    for key in (f"feature:{feature_id}", f"spec:{feature_id}"):
+        if key in state.masks:
+            return state.masks[key]
+    raise KeyError(f"unknown feature {feature_id!r}; known: {', '.join(known_features(state)) or 'none'}")
+
+
+def known_features(state: WorldState) -> list[str]:
+    """Names a region or palette rule can use: op ids and spec feature ids."""
+    return sorted({k.split(":", 1)[1] for k in state.masks if k.startswith(("feature:", "spec:"))})
 
 
 # ---------------------------------------------------------------- falloff and blending

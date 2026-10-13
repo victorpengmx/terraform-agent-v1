@@ -5,6 +5,7 @@ from __future__ import annotations
 import numpy as np
 from pydantic import Field
 
+from terrain.brushes import known_features
 from terrain.materials import BLOCK_LOOKS_TEXT, BlockName, Rule
 from terrain.ops.region import REGION_HELP, Region, region_shape
 from terrain.ops.registry import OpError, OpParams, register_op
@@ -28,7 +29,7 @@ def set_palette_rules(state: WorldState, p: SetPaletteRulesParams) -> WorldState
     Use banded for layered rock walls, mix for natural patchy ground, single for uniform surfaces.
     Replaces the default palette entirely; only the latest set_palette_rules applies.
     """
-    known = {k.removeprefix("feature:") for k in state.masks if k.startswith("feature:")}
+    known = set(known_features(state))
     for i, rule in enumerate(p.rules):
         if rule.when.feature is not None and rule.when.feature not in known:
             raise OpError(f"rule {i} refers to unknown feature {rule.when.feature!r}; known: {', '.join(sorted(known)) or 'none'}")

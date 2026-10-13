@@ -64,16 +64,24 @@ ID_PROPERTY = {
 }
 
 
+FEATURE_PROPERTY = {
+    "type": "string",
+    "description": "Optional: the spec feature this op builds or shapes, e.g. 'river_1'. The checklist measures each "
+    "spec feature over the ops tagged with it.",
+}
+
+
 def op_tools(session: Session) -> list[Tool]:
     """One tool per registered op, in the registry's deterministic order (keeps the prompt cache stable).
 
-    Each schema gains an optional `id`, which names the op (and its feature) in the op stack.
+    Each schema gains an optional `id`, which names the op in the op stack, and an optional `feature`, the spec
+    feature it builds (DESIGN §4.3).
     """
 
     def make_handler(op_name: str) -> Callable[[dict[str, Any]], Content]:
         def handler(params: dict[str, Any]) -> Content:
             params = dict(params)
-            entry = session.apply(op_name, params, id=params.pop("id", None))
+            entry = session.apply(op_name, params, id=params.pop("id", None), feature=params.pop("feature", None))
             return f"applied {entry.id}: {session.effect(entry, detail=True)}. Terrain now: {session.stats()}"
 
         return handler
@@ -81,7 +89,7 @@ def op_tools(session: Session) -> list[Tool]:
     tools = []
     for s in list_ops():
         schema = s.params.model_json_schema()
-        schema["properties"] = {"id": ID_PROPERTY, **schema.get("properties", {})}
+        schema["properties"] = {"id": ID_PROPERTY, "feature": FEATURE_PROPERTY, **schema.get("properties", {})}
         tools.append(Tool(name=s.name, description=s.description, input_schema=schema, handler=make_handler(s.name)))
     return tools
 

@@ -49,7 +49,7 @@ class PathRegion(OpParams):
 
 
 class FeatureRegion(OpParams):
-    feature: str = Field(min_length=1, description="An op id; selects that op's footprint.")
+    feature: str = Field(min_length=1, description="An op id or a spec feature id; selects its footprint.")
 
 
 def _kind(v: Any) -> str | None:
@@ -69,7 +69,7 @@ Region = Annotated[
 ]
 
 REGION_HELP = ('{"circle": {"center": [u, v], "radius": r}}, {"polygon": [[u, v], ...]}, '
-               '{"path": {"points": [[u, v], ...], "width": w}} or {"feature": "<op id>"} (that op\'s footprint)')
+               '{"path": {"points": [[u, v], ...], "width": w}} or {"feature": "<op id or spec feature id>"} (its footprint)')
 EDGE_HELP = "Fade-out width beyond the region, fraction of the shorter side."
 
 

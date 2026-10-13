@@ -55,3 +55,18 @@ class ScriptedModel:
         if not self.responses:
             raise AssertionError("ScriptedModel ran out of responses")
         return self.responses.pop(0)
+
+
+def feature(id: str, type: str = "peak", x: str | None = "any", y: str | None = "any", **kw: Any) -> dict:
+    """A spec feature in the SPEC reply format (text position by default)."""
+    position = {"x": x, "y": y, "image_x": None, "depth": None} | kw.pop("position", {})
+    return {"id": id, "type": type, "position": position, "slope": None, "winding": None, "tallest": False,
+            "part_of": None, "notes": ""} | kw
+
+
+def graph(*features: dict, relations: list | None = None) -> dict:
+    return {"features": list(features), "relations": relations or [], "materials": "", "unsupported": []}
+
+
+def spec_json(g: dict) -> ModelResponse:
+    return response(text(json.dumps(g)))

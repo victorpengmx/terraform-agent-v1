@@ -159,6 +159,16 @@ whole path, amplitude from width and length) topped out at 1.08–1.30 for meand
   create many features (a scatter op → 40 pillars). [MVP] Every op tool takes an optional `feature`
   (a spec feature id); code keeps the spec feature → op ids mapping and measures each spec feature over
   the union of its ops' footprints. Ops without a feature are global or supporting edits.
+- [M5, as built] Op tools take an optional `feature`, stored on the op (`OpEntry.feature`, in the stack
+  JSON; `update_op` can retag). Unknown spec ids are an agent-facing error.
+  - **Measurement:** `measure_spec_feature` works over the union of the tagged ops' footprints. It adds a
+    weighted centroid, a river's source and mouth, and the sinuosity of a river or a valley path.
+  - **Slope:** for plateaus, mesas, canyons, valleys and basins, slope is the 90th percentile over the
+    footprint (their walls). On the mesa demo, the mean says moderate (26°) for a sheer mesa; the 90th
+    percentile says cliff (77°).
+  - **Spec feature as a region:** the op stack keeps a `spec:<id>` union mask, so a region or palette
+    rule can name a spec feature (`{"feature": "river_1"}`) as well as an op id. The builder did this
+    unprompted in the first runs.
 - A per-column **dominant-feature label map** (largest height change wins) resolves overlaps for
   measurement, annotation (§10.4) and checks.
 - **Counts are derived by code** and shown in observations ("3 peaks, 1 river, 1 pillar field (40
@@ -509,6 +519,30 @@ graph and 3D-GPT's prompt expansion (§17):
 - Unsupported requests (mist, buildings, vegetation before it exists) go to `unsupported`, so neither the
   builder nor the critic chases them.
 
+**As built in M5** (`agent/spec.py`):
+- **Schema:**
+  - features: `id`, `type`, `position` (text `x`/`y` or image `image_x`/`depth`), `slope`, `winding`,
+    `tallest`, `part_of`, `notes`
+  - relations: `left_of`, `right_of`, `behind`, `in_front_of`, `taller_than`, `lower_than`, `flows_from`,
+    `reaches`
+  - also `materials` and `unsupported`
+
+  `tallest` and `part_of` are feature attributes. The JSON schema carries no numeric or length
+  constraints (structured outputs reject them); `FeatureGraph.problems()` checks counts (1–15), ids and
+  references in code.
+- **Viewpoint (text):** the viewer stands at the south edge looking north: left = west, right = east,
+  back = north (v = 0), front = south (v = 1).
+- **SPEC call:** the builder model in a fresh context. An unusable reply or invalid graph is retried once;
+  a second failure builds from the raw prompt without a checklist (traced, like a failed critique).
+  `run_task(graph=...)` takes a given graph (M6's hand-written ones), and `--no-spec` skips the step.
+- **SPEC prompt rules from the spot check** (EVIDENCE 2026-10-23):
+  - a position only where the request states or clearly implies the feature's centre
+  - only relations the wording gives
+  - slope of a plateau, mesa, canyon, valley or basin means its walls
+  - winding applies to rivers, valleys and canyons
+- **Pinned text:** the builder, critic and comparison see the request plus each feature with its projected
+  (u, v) band, the relations, materials and unsupported items (`spec_text`).
+
 **Later:** CLARIFY before SPEC; user approval of the graph; graph edits from mid-run feedback; richer
 relations (`surrounds`, `between`, `along`).
 
@@ -643,6 +677,20 @@ renders):
 | looks natural; matches mood and palette | VLM, on L2 (and `ref_view`) |
 
 - **Dependencies:** if "river_1 exists" fails, skip its child items. [MVP]
+- **As built in M5** (`agent/checklist.py`). Items:
+  - `<id>.exists` (an untagged feature fails with "pass feature='<id>'")
+  - `<id>.position`: the centroid is in the band
+  - `<id>.slope` and `<id>.winding`: one category of slack, one off = minor
+  - `<id>.tallest`
+  - one item per relation:
+    - `left_of`/`right_of`/`behind`/`in_front_of`: centres at least 0.05 apart
+    - `taller_than`/`lower_than`: summits at least 2 blocks apart
+    - `flows_from`: the source is within 3 blocks of the feature
+    - `reaches`: the mouth is within 2 blocks of the edge or feature
+
+  Fix hints point the right way (steeper or gentler, more or fewer bends) and name parameter values
+  (meander 0.3 / 0.6 / 1.0). Any failed major item forces "revise". The critic model and the builder see
+  the pass count and every failed item.
 - **Code-checked items** (existence, categories, relative position and height, `flows_from`, `reaches`)
   are computed from measured feature attributes (§4.2) and the mapping (§4.3). [MVP]
 - **VLM items** (looks, mood, palette) as yes/no questions. When the VLM is unsure, mark the item
@@ -660,7 +708,8 @@ in-call comparison labelled "previous"/"revision": models favour the item framed
 keep the revision almost always. Design:
 
 1. **Roll back** if the revision fails a blocking or major programmatic check the previous attempt passed.
-2. **Roll back** if the spec checklist pass count drops (§11.3).
+2. **Roll back** if the spec checklist pass count drops (§11.3). Since M5 also the reverse: a revision
+   that passes more checklist items is kept without a comparison. Equal counts go on to rule 3.
 3. Otherwise a **blind comparison**, a call separate from the critique:
    - the two attempts shown as "Terrain 1" and "Terrain 2" in a seeded random order (seed = run seed +
      round); nothing says which is newer; record the order in the trace
@@ -678,7 +727,9 @@ keep the revision almost always. Design:
 Implementation details (M4, `agent/harness.py`):
 - **Baseline.** Round 1's attempt is accepted as the baseline, failed checks or not: there is nothing to
   compare it with. A "pass" verdict ends the run only on an accepted attempt.
-- **Rule 2** arrives with the spec checklist (M5); until then, rule 1 goes straight to rule 3.
+- **Rule 2** (M5) is symmetric, decided 2026-10-23: fewer passes roll back and more passes keep the
+  revision. In the first runs a revision that fixed a spec item (5/7 → 6/7) was rolled back by the
+  comparison; objective evidence now takes precedence over the model's preference.
 - **Order.** `random.Random(run_seed * 1000 + round)` decides whether the revision is Terrain 1.
 - **Neutral renders.** Comparison renders use the renderers' neutral titles (size and height range);
   builder and critic renders are titled with the op count, which would reveal recency.
@@ -734,6 +785,14 @@ building. Design:
    foreshortening; the slope perpendicular to the view can't be inferred, so leave it to defaults and
    erosion.
 7. **Sketch maps** (top-down drawings) remove the projection problem: photos for mood, sketches for layout.
+
+**Projection as built** (`agent/spec.py` `bands`): a fixed camera at the south edge looking north.
+- **depth → v band:** far [0, 0.4], middle [0.3, 0.7], near [0.6, 1].
+- **image_x → u centre:** left 0.1, center-left 0.3, center 0.5, center-right 0.7, right 0.9. The centre
+  is spread by the frame width at that depth (near 0.5, middle 0.75, far 1.0 of the area's width), with a
+  band half-width of 0.12 near, 0.18 middle and 0.25 far.
+- **Text bands:** left [0, 0.45], center [0.25, 0.75], right [0.55, 1], and the same for back, middle and
+  front. The overlap is the one category of slack.
 
 **MVP (minimal):** steps 1, 2 and the critic part of 5 with the standard L2 overview instead of
 `ref_view`: the critic sees the reference next to the L2 overview and fills `reference_match`. Images go

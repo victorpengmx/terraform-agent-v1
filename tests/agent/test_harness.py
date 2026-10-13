@@ -21,6 +21,7 @@ def session():
 def run(session, model, tmp_path, **kw):
     tools = {t.name: t for t in op_tools(session)}
     kw.setdefault("budget", Budget())
+    kw.setdefault("use_spec", False)  # SPEC behaviour is tested separately (test_spec_step.py)
     return run_task(prompt="a hill", images=[], session=session, tools=tools, model=model,
                     tracer=Tracer(run_id="t", root=tmp_path), **kw)
 
@@ -203,7 +204,7 @@ def test_render_view_image_reaches_the_model_but_not_the_trace(session, tmp_path
     )
     tools = {t.name: t for t in [*op_tools(session), *observe_tools(session, tmp_path / "views")]}
     run_task(prompt="a hill", images=[], session=session, tools=tools, model=model,
-             tracer=Tracer(run_id="t", root=tmp_path), budget=Budget())
+             tracer=Tracer(run_id="t", root=tmp_path), budget=Budget(), use_spec=False)
     last = model.calls[2]["messages"][-1]["content"][0]  # tool_result for render_view
     assert last["is_error"] is False and [b["type"] for b in last["content"]] == ["text", "image"]
     trace = (tmp_path / "t.jsonl").read_text()

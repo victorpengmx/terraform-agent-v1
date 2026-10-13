@@ -61,12 +61,15 @@ class FeatureAttributes:
     top_y: float  # highest surface in the body (summit for raised features)
     top_uv: tuple[float, float]
     bottom_y: float  # lowest surface in the body (floor for valleys and basins)
-    slope_mean: float  # degrees, over the body
+    slope_mean: float  # degrees: mean over the body, or for wall-defined spec features the walls' 90th percentile
     slope_class: str
     edges: tuple[str, ...]  # area edges the footprint touches: n, s, w, e
     prominence: float | None = None  # raised features only
     sinuosity: float | None = None  # rivers only
     winding: str | None = None
+    centroid_uv: tuple[float, float] | None = None  # footprint-weighted centre
+    source_uv: tuple[float, float] | None = None  # rivers: first point of the channel line
+    mouth_uv: tuple[float, float] | None = None  # rivers: last point
 
 
 def feature_type(entry: OpEntry) -> str | None:
@@ -81,41 +84,92 @@ def feature_type(entry: OpEntry) -> str | None:
             "set_sea_level": "sea"}.get(entry.op)
 
 
-def measure_features(stack: OpStack) -> dict[str, FeatureAttributes]:
-    """Attributes of every form-op feature in the stack, in replay order."""
-    state = stack.state
-    slope, _ = surface_metrics(state)
-    peaks: dict[int, float] | None = None  # computed once, only if a raised feature needs it
-    out: dict[str, FeatureAttributes] = {}
-    for entry in stack.entries:
-        kind = feature_type(entry)
-        feature = state.features.get(entry.id)
-        if kind is None or feature is None:
-            continue
-        mask = state.masks[f"feature:{entry.id}"]
+class _Measurer:
+    """Shared per-stack inputs: slope once, prominences only if a raised feature needs them."""
+
+    def __init__(self, stack: OpStack) -> None:
+        self.stack, self.state = stack, stack.state
+        self.slope, _ = surface_metrics(self.state)
+        self._peaks: dict[int, float] | None = None
+
+    def peaks(self) -> dict[int, float]:
+        if self._peaks is None:
+            self._peaks = peak_prominences(self.state.height)
+        return self._peaks
+
+    def measure(self, ident: str, op: str, kind: str, mask: np.ndarray, bounds: tuple[float, float, float, float],
+                raised: bool, rivers: list[OpEntry], walls: bool = False, valleys: list[OpEntry] = ()) -> FeatureAttributes:
+        state = self.state
         body = mask > CORE
         if not body.any():
             body = mask > FOOTPRINT
         h = np.where(body, state.height, -np.inf)
         z, x = np.unravel_index(int(h.argmax()), h.shape)
-        prominence = sinuosity = None
-        if kind in RAISED:
-            if peaks is None:
-                peaks = peak_prominences(state.height)
-            prominence = max((p for cell, p in peaks.items() if body.flat[cell]), default=0.0)
-        if kind == "river":
-            sinuosity = river_sinuosity(stack, entry)
-        mean_slope = float(slope[body].mean())
-        out[entry.id] = FeatureAttributes(
-            id=entry.id, op=entry.op, type=kind, bounds=feature.bounds,
+        prominence = max((p for cell, p in self.peaks().items() if body.flat[cell]), default=0.0) if raised else None
+        sinuosity = (river_sinuosity(self.stack, rivers[0]) if rivers
+                     else valley_sinuosity(self.stack, valleys[0]) if valleys else None)
+        source = mouth = None
+        if rivers:
+            first, last = river_line(self.stack, rivers[0]), river_line(self.stack, rivers[-1])
+            source, mouth = self._uv(first[0]), self._uv(last[-1])
+        zz, xx = np.mgrid[0 : state.depth, 0 : state.width]
+        w = np.where(mask > FOOTPRINT, mask, 0.0)
+        centroid = (float((xx * w).sum() / w.sum()) / (state.width - 1), float((zz * w).sum() / w.sum()) / (state.depth - 1))
+        # Plateaus, mesas, canyons, valleys and basins are defined by their walls: a mean over a flat top or
+        # floor would call a sheer mesa "moderate" (mesa demo: mean 26°, 90th percentile 77°).
+        mean_slope = float(np.percentile(self.slope[mask > FOOTPRINT], 90)) if walls else float(self.slope[body].mean())
+        return FeatureAttributes(
+            id=ident, op=op, type=kind, bounds=bounds,
             top_y=float(state.height[z, x]), top_uv=(x / (state.width - 1), z / (state.depth - 1)),
             bottom_y=float(state.height[body].min()),
             slope_mean=mean_slope, slope_class=classify(mean_slope, SLOPE_CLASSES),
             edges=touched_edges(mask > FOOTPRINT),
             prominence=None if prominence is None else float(prominence),
             sinuosity=sinuosity, winding=None if sinuosity is None else classify(sinuosity, WINDING_CLASSES),
+            centroid_uv=centroid, source_uv=source, mouth_uv=mouth,
         )
+
+    def _uv(self, xz: np.ndarray) -> tuple[float, float]:
+        return float(xz[0]) / (self.state.width - 1), float(xz[1]) / (self.state.depth - 1)
+
+
+def measure_features(stack: OpStack) -> dict[str, FeatureAttributes]:
+    """Attributes of every form-op feature in the stack, in replay order."""
+    m = _Measurer(stack)
+    out: dict[str, FeatureAttributes] = {}
+    for entry in stack.entries:
+        kind = feature_type(entry)
+        feature = m.state.features.get(entry.id)
+        if kind is None or feature is None:
+            continue
+        out[entry.id] = m.measure(entry.id, entry.op, kind, m.state.masks[f"feature:{entry.id}"], feature.bounds,
+                                  raised=kind in RAISED, rivers=[entry] if kind == "river" else [])
     return out
+
+
+# Spec feature types (agent/spec.py) whose summit and prominence mean something, and those whose slope class
+# is their walls' (90th percentile over the footprint) rather than their mean slope.
+RAISED_SPEC_TYPES = ("peak", "mountain_range", "hills", "ridge", "plateau", "mesa", "island")
+WALL_SPEC_TYPES = ("plateau", "mesa", "canyon", "valley", "basin")
+
+
+def measure_spec_feature(stack: OpStack, feature_id: str, kind: str, op_ids: list[str]) -> FeatureAttributes | None:
+    """Attributes of a spec feature, measured over the union of the footprints of the ops tagged with it
+    (DESIGN §4.3). None when none of those ops changed any height or water."""
+    m = _Measurer(stack)
+    masks = [m.state.masks[f"feature:{i}"] for i in op_ids if f"feature:{i}" in m.state.masks]
+    if not masks:
+        return None
+    mask = np.maximum.reduce(masks)
+    zs, xs = np.nonzero(mask > FOOTPRINT)
+    if not len(zs):
+        return None
+    w, d = m.state.width - 1, m.state.depth - 1
+    bounds = (round(xs.min() / w, 3), round(zs.min() / d, 3), round(xs.max() / w, 3), round(zs.max() / d, 3))
+    rivers = [e for e in stack.entries if e.id in op_ids and e.op == "carve_river"]
+    valleys = [e for e in stack.entries if e.id in op_ids and e.op == "carve_valley"]
+    return m.measure(feature_id, "+".join(op_ids), kind, mask, bounds, raised=kind in RAISED_SPEC_TYPES, rivers=rivers,
+                     walls=kind in WALL_SPEC_TYPES, valleys=valleys)
 
 
 def touched_edges(footprint: np.ndarray) -> tuple[str, ...]:
@@ -123,13 +177,28 @@ def touched_edges(footprint: np.ndarray) -> tuple[str, ...]:
     return tuple(name for name, line in sides if line.any())
 
 
-def river_sinuosity(stack: OpStack, entry: OpEntry) -> float | None:
-    """Channel length / straight distance, from the same centre line carve_river cut (same params, seed)."""
+def river_line(stack: OpStack, entry: OpEntry) -> np.ndarray:
+    """The centre line carve_river cut for this op (same params, same seed), as block (x, z) points."""
     from terrain.ops.water import CarveRiverParams, river_centerline
 
     base = stack.base
     seeded = WorldState.flat(base.width, base.depth, base_y=base.base_y, seed=op_seed(base.seed, entry.id))
-    pts = river_centerline(seeded, CarveRiverParams.model_validate(entry.params))
+    return river_centerline(seeded, CarveRiverParams.model_validate(entry.params))
+
+
+def valley_sinuosity(stack: OpStack, entry: OpEntry) -> float | None:
+    """Sinuosity of a carve_valley floor line (its smoothed path): a valley or canyon can wind too."""
+    from terrain.brushes import smooth_path, to_blocks
+
+    state = stack.state
+    pts = np.array([to_blocks(state, p) for p in smooth_path(state, entry.params["path"])])
+    straight = float(np.hypot(*(pts[-1] - pts[0])))
+    return None if straight < 1.0 else float(np.hypot(*np.diff(pts, axis=0).T).sum()) / straight
+
+
+def river_sinuosity(stack: OpStack, entry: OpEntry) -> float | None:
+    """Channel length / straight distance, from the same centre line carve_river cut (same params, seed)."""
+    pts = river_line(stack, entry)
     straight = float(np.hypot(*(pts[-1] - pts[0])))
     if straight < 1.0:
         return None

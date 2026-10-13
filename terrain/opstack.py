@@ -43,6 +43,7 @@ class OpEntry:
     id: str
     op: str
     params: dict[str, Any]  # validated, JSON-safe (pydantic mode="json")
+    feature: str | None = None  # the spec feature this op builds (DESIGN §4.3); not an op parameter
 
     @property
     def stage_index(self) -> int:
@@ -88,8 +89,8 @@ class OpStack:
 
     # ------------------------------------------------------------ edit
 
-    def add(self, op: str, params: dict[str, Any], id: str | None = None) -> OpEntry:
-        entry = self._make_entry(op, params, id)
+    def add(self, op: str, params: dict[str, Any], id: str | None = None, feature: str | None = None) -> OpEntry:
+        entry = self._make_entry(op, params, id, feature=feature)
         if all(e.stage_index <= entry.stage_index for e in self._entries):
             state = self._apply(self._state, entry)  # incremental: it runs last anyway
         else:
@@ -98,16 +99,19 @@ class OpStack:
         self._state = state
         return entry
 
-    def update(self, op_id: str, params: dict[str, Any]) -> OpEntry:
+    def update(self, op_id: str, params: dict[str, Any], feature: str | None | object = ...) -> OpEntry:
         """Change some params of an existing op (unspecified params keep their values) and replay.
 
-        Stored values derived from a changed param (e.g. roughness from a new `character`) are re-derived."""
+        Stored values derived from a changed param (e.g. roughness from a new `character`) are re-derived.
+        `feature` retags the op (None clears the tag; omitted keeps it); a retag replays too, so the spec
+        features' footprints stay right."""
         old = self.get(op_id)
+        new_feature = old.feature if feature is ... else feature
         stale_on_update = getattr(get_op(old.op).params, "stale_on_update", None)
         stale = stale_on_update(set(params)) if stale_on_update else set()
         kept = {k: v for k, v in old.params.items() if k not in stale}
         merged = validate_params(old.op, {**kept, **params}).model_dump(mode="json")
-        new = OpEntry(id=old.id, op=old.op, params=merged)
+        new = OpEntry(id=old.id, op=old.op, params=merged, feature=new_feature)  # type: ignore[arg-type]
         entries = [new if e.id == op_id else e for e in self._entries]
         self._state = self._replay(entries)
         self._entries = entries
@@ -135,7 +139,7 @@ class OpStack:
 
     def to_json(self) -> str:
         base = {"width": self.base.width, "depth": self.base.depth, "base_y": self.base.base_y, "seed": self.base.seed}
-        ops = [{"id": e.id, "op": e.op, "params": e.params} for e in self._entries]
+        ops = [{"id": e.id, "op": e.op, "params": e.params} | ({"feature": e.feature} if e.feature else {}) for e in self._entries]
         return json.dumps({"base": base, "ops": ops}, sort_keys=True)
 
     @classmethod
@@ -144,14 +148,15 @@ class OpStack:
         stack = cls(BaseSpec(**data["base"]))
         entries: list[OpEntry] = []
         for o in data["ops"]:
-            entries.append(stack._make_entry(o["op"], o["params"], o["id"], existing=entries))
+            entries.append(stack._make_entry(o["op"], o["params"], o["id"], existing=entries, feature=o.get("feature")))
         stack._state = stack._replay(entries)
         stack._entries = entries
         return stack
 
     # ------------------------------------------------------------ internals
 
-    def _make_entry(self, op: str, params: dict[str, Any], op_id: str | None, existing: list[OpEntry] | None = None) -> OpEntry:
+    def _make_entry(self, op: str, params: dict[str, Any], op_id: str | None, existing: list[OpEntry] | None = None,
+                    feature: str | None = None) -> OpEntry:
         existing = self._entries if existing is None else existing
         get_op(op)  # unknown op -> OpError listing the available ones
         validated = validate_params(op, params).model_dump(mode="json")
@@ -164,7 +169,9 @@ class OpStack:
             raise OpError(f"invalid id {op_id!r}: use lowercase letters, digits and _ (e.g. 'mountain_1'), max 40 chars")
         if any(e.id == op_id for e in existing):
             raise OpError(f"id {op_id!r} is already used; pick another or update_op it")
-        return OpEntry(id=op_id, op=op, params=validated)
+        if feature is not None and not ID_PATTERN.match(feature):
+            raise OpError(f"invalid feature {feature!r}: use a spec feature id such as 'river_1'")
+        return OpEntry(id=op_id, op=op, params=validated, feature=feature)
 
     def _replay(self, entries: list[OpEntry]) -> WorldState:
         state = self.base.make_state()
@@ -179,6 +186,10 @@ class OpStack:
             raise OpError(f"{entry.id}: {err}") from None
         after.seed = self.base.seed
         _record_feature(state, after, entry)
+        if entry.feature:  # the spec feature's footprint: the union of its tagged ops (regions can name it)
+            key, mask = f"spec:{entry.feature}", after.masks.get(f"feature:{entry.id}")
+            if mask is not None:
+                after.masks[key] = np.maximum(after.masks[key], mask) if key in after.masks else mask.copy()
         return after
 
 

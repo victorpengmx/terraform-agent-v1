@@ -17,6 +17,8 @@ from scipy.ndimage import grey_opening
 
 from agent.models import ModelAdapter, ModelResponse
 from agent.session import Session
+from agent.checklist import Item, checklist, summary as checklist_summary
+from agent.spec import spec_text
 from agent.tools import image_block, text_block
 from terrain.compiler.compile import surface_y, water_top
 from terrain.features import feature_report, measure_features
@@ -99,6 +101,21 @@ class CritiqueResult(BaseModel):
     scores: RubricScores | None = None  # None when a blocking check short-circuited the model call
     verdict: Literal["pass", "revise"]
     failed: str | None = None  # why the critic model gave no usable critique this round (checks still ran)
+    checklist: list[Item] = []  # spec checklist (DESIGN §11.3), computed by code; empty without a feature graph
+
+    @property
+    def checklist_passes(self) -> int:
+        return sum(i.status == "pass" for i in self.checklist)
+
+    def checklist_losses(self, previous: CritiqueResult) -> list[Item]:
+        """Checklist items that pass in `previous` but not here (shown when gate rule 2 rolls back)."""
+        passed_before = {i.id for i in previous.checklist if i.status == "pass"}
+        return [i for i in self.checklist if i.status != "pass" and i.id in passed_before]
+
+    def checklist_gains(self, previous: CritiqueResult) -> list[Item]:
+        """Checklist items that pass here but not in `previous` (shown when gate rule 2 keeps a revision)."""
+        passed_before = {i.id for i in previous.checklist if i.status == "pass"}
+        return [i for i in self.checklist if i.status == "pass" and i.id not in passed_before]
 
     def regressions(self, previous: CritiqueResult) -> list[CheckResult]:
         """Blocking or major checks that fail here but passed in `previous` (acceptance gate rule 1)."""
@@ -123,6 +140,8 @@ class CritiqueResult(BaseModel):
         if failed:
             lines.append("Failed checks:")
             lines += [f"- [{c.severity}] {c.name}: {c.detail}" for c in failed]
+        if self.checklist:
+            lines.append(checklist_summary(self.checklist))
         if self.issues:
             lines.append("Issues:")
             lines += [f"- [{i.severity}] at {i.location}: {i.description} Fix: {i.fix_hint}{_fix_text(i)}" for i in self.issues]
@@ -187,6 +206,11 @@ def _palette_text(state: WorldState) -> str:
     return f"{label}: " + json.dumps(rules, separators=(",", ":"))
 
 
+def spec_checklist(spec: dict, session: Session) -> list[Item]:
+    """The spec checklist for the current terrain, or [] when the run has no feature graph."""
+    return checklist(spec["graph"], session.stack) if spec.get("graph") is not None else []
+
+
 def _neighbours(a: np.ndarray) -> np.ndarray:
     p = np.pad(a, 1, mode="edge")
     return np.stack([p[:-2, 1:-1], p[2:, 1:-1], p[1:-1, :-2], p[1:-1, 2:]])
@@ -241,7 +265,9 @@ where it is steep or high, soil and grass where it is gentle, sand or gravel at 
 naturally? 1 = wrong or one block everywhere, 3 = plausible with artifacts (rings or stripes of one block, \
 bare stone walls, abrupt switches at one slope), 5 = convincing. Fix materials with set_palette_rules or \
 paint_region.
-- reference_match: similarity to the reference images; null if there are none.
+- reference_match: how well the terrain matches the reference images, null if there are none. The photo is a \
+perspective view; the 3D render is from the south-west corner, so compare the main landforms, their \
+arrangement (left/right, near/far), proportions, mood and palette, not exact geometry.
 
 3 means acceptable. Reserve 5 for results you would show as a showcase. Locate every issue with an op id \
 or a normalized 'u,v' position ((0,0) = north-west corner) and give a concrete fix: the tool that makes it \
@@ -337,6 +363,8 @@ def hint_problems(issue: Issue, stack) -> list[str]:
         return [f"unknown tool {issue.tool!r}"]
     problems = []
     for c in issue.changes:
+        if c.param == "feature" and issue.tool == "update_op":
+            continue  # retagging an op with a spec feature
         if c.param not in fields:
             problems.append(f"{op_name} has no parameter {c.param!r}")
             continue
@@ -367,14 +395,16 @@ class Critic:
     ) -> tuple[CritiqueResult, ModelResponse | None]:
         """Returns the critique and the model response (for budget and tracing; None if short-circuited)."""
         checks = self.run_checks(session)
+        items = spec_checklist(spec, session)
         if any(not c.passed and c.severity == "blocking" for c in checks):
-            return CritiqueResult(checks=checks, verdict="revise"), None
+            return CritiqueResult(checks=checks, checklist=items, verdict="revise"), None
 
         text = [
-            "# Spec\n" + json.dumps(spec, indent=2, sort_keys=True),
+            "# Spec\n" + spec_text(spec),
             f"# Terrain statistics\n{session.stats()}",
             f"# Features (measured by code)\n{feature_report(measure_features(session.stack))}",
             f"# Ops applied\n{session.summary()}",
+            *(["# Spec checklist (code-checked; failed items are issues)\n" + checklist_summary(items)] if items else []),
             "# Surface palette in use (set_palette_rules replaces all of it)\n" + _palette_text(session.state),
             "# Programmatic checks\n" + "\n".join(f"- {c.name}: {'pass' if c.passed else 'FAIL'} ({c.detail})" for c in checks),
         ]
@@ -391,8 +421,9 @@ class Critic:
 
         out, response = self._structured(content, self.system, CritiqueOutput)
         failed_major = any(not c.passed and c.severity == "major" for c in checks)
+        failed_major |= any(i.status == "fail" and i.severity == "major" for i in items)
         verdict = "revise" if failed_major else out.verdict
-        return CritiqueResult(checks=checks, issues=out.issues, scores=out.scores, verdict=verdict), response
+        return CritiqueResult(checks=checks, issues=out.issues, scores=out.scores, verdict=verdict, checklist=items), response
 
     def compare(
         self, spec: dict, first: AttemptView, second: AttemptView, references: list[bytes] | None = None
@@ -400,7 +431,7 @@ class Critic:
         """Blind comparison for the acceptance gate (DESIGN §11.4): two terrains as "Terrain 1" and "Terrain 2",
         with renders and statistics only. Nothing says which is newer: no op lists, no previous critique."""
         content = [image_block(r) for r in references or []]
-        intro = "# Spec\n" + json.dumps(spec, indent=2, sort_keys=True)
+        intro = "# Spec\n" + spec_text(spec)
         if references:
             intro += "\n\nReference images are attached above."
         content.append(text_block(intro))
