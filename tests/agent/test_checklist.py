@@ -149,3 +149,13 @@ def test_gate_rule_2_keeps_a_higher_checklist_pass_count_without_a_comparison(s,
     notes = [json.loads(l).get("note") or "" for l in (tmp_path / "t.jsonl").read_text().splitlines()]
     assert any("accepted round 2: it passes 1 spec checklist items, the accepted attempt 0; newly met: peak_1 (peak) exists" in n
                for n in notes)
+
+
+def test_extent_passes_for_a_full_width_ridge_and_fails_for_a_single_cone():
+    s = Session.flat(129, 129, base_y=64)
+    s.apply("raise_ridge", {"path": [[0.03, 0.15], [0.97, 0.15]], "width": 0.25, "height": 60}, feature="range_1")
+    s.apply("raise_peak", PEAK | {"center": [0.5, 0.7], "radius": 0.2, "height": 40}, feature="range_2")
+    got = items(graph(feature("range_1", "mountain_range", span_x="full"), feature("range_2", "mountain_range", span_x="full")), s)
+    assert got["range_1.span_x"].status == "pass"
+    cone = got["range_2.span_x"]
+    assert cone.status == "fail" and cone.severity == "major" and "raise_ridge" in cone.detail

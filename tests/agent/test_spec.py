@@ -79,3 +79,21 @@ def test_images_go_first_and_ask_for_image_positions():
     write_spec(model, "", images=[b"\x89PNG fake"])
     blocks = model.calls[0]["messages"][0]["content"]
     assert [b["type"] for b in blocks] == ["image", "text"] and "image positions" in blocks[1]["text"]
+
+
+def test_image_spans_are_relative_to_the_frame_at_that_depth():
+    from agent.spec import SpecFeature, span_classes
+
+    def f(depth):
+        return SpecFeature.model_validate(feature("r", "mountain_range", x=None, y=None, position={"image_x": "center", "depth": depth}))
+
+    far, near = dict(span_classes(f("far"), "x")), dict(span_classes(f("near"), "x"))
+    assert far["wide"] == pytest.approx(2 / 3) and near["wide"] == pytest.approx(1 / 3)  # near frame = half the area
+    assert dict(span_classes(f("near"), "y"))["wide"] == pytest.approx(2 / 3)  # far-to-near is not scaled
+    text = SpecFeature.model_validate(feature("r", "mountain_range", span_x="full"))
+    assert dict(span_classes(text, "x"))["narrow"] == pytest.approx(1 / 3)
+
+
+def test_graph_text_shows_spans():
+    g = FeatureGraph.model_validate(graph(feature("range_1", "mountain_range", y="back", span_x="full")))
+    assert "range_1 (mountain_range): u 0.00-1.00, v 0.00-0.45; spans full west-east" in graph_text(g)

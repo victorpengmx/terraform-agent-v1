@@ -43,6 +43,8 @@ class SpecFeature(_Strict):
     id: str
     type: FeatureType
     position: Position
+    span_x: Literal["narrow", "wide", "full"] | None  # how far it reaches west-east (image: across the frame)
+    span_y: Literal["narrow", "wide", "full"] | None  # how far it reaches north-south (image: from far to near)
     slope: Literal["gentle", "moderate", "steep", "cliff"] | None
     winding: Literal["almost straight", "winding", "twisty", "meandering"] | None
     tallest: bool
@@ -113,12 +115,23 @@ def bands(p: Position) -> tuple[float, float, float, float]:
     return u0, u1, v0, v1
 
 
+SPAN_CLASSES = (("narrow", 1 / 3), ("wide", 2 / 3), ("full", float("inf")))
+
+
+def span_classes(f: SpecFeature, axis: str) -> tuple[tuple[str, float], ...]:
+    """Category bounds for a footprint's extent as a share of the area. An image's span_x is relative to the
+    frame, which at the feature's depth covers FRAME_WIDTH of the area, so its bounds shrink by that factor."""
+    scale = FRAME_WIDTH.get(f.position.depth or "", 1.0) if axis == "x" and f.position.image_x is not None else 1.0
+    return tuple((name, bound * scale) for name, bound in SPAN_CLASSES)
+
+
 def graph_text(graph: FeatureGraph) -> str:
     """The pinned form the builder and critic see: each feature with its (u, v) band, then the relations."""
     lines = ["Features (u = west->east, v = north->south; the band is where the feature's centre should be):"]
     for f in graph.features:
         u0, u1, v0, v1 = bands(f.position)
-        attrs = [f"slope {f.slope}" if f.slope else "", f"winding {f.winding}" if f.winding else "",
+        attrs = [f"spans {f.span_x} west-east" if f.span_x else "", f"spans {f.span_y} north-south" if f.span_y else "",
+                 f"slope {f.slope}" if f.slope else "", f"winding {f.winding}" if f.winding else "",
                  "tallest" if f.tallest else "", f"part of {f.part_of}" if f.part_of else ""]
         attrs = ", ".join(a for a in attrs if a)
         where = "anywhere" if (u0, u1, v0, v1) == (0.0, 1.0, 0.0, 1.0) else f"u {u0:.2f}-{u1:.2f}, v {v0:.2f}-{v1:.2f}"
@@ -152,6 +165,10 @@ image and leave x and y null.
 - slope: only if the request implies it: gentle (<15 deg), moderate (15-35), steep (35-60), cliff (>60); \
 else null. For plateaus, mesas, canyons, valleys and basins it means their walls. winding, for rivers, \
 valleys and canyons: almost straight, winding, twisty, meandering; else null.
+- span_x, span_y: how far the feature reaches west-east and north-south: narrow (under a third of the area), \
+wide (a third to two thirds), full (more than two thirds). Only when the request or image shows it ("a range \
+across the whole horizon", "ridges running from the back to the front"); else null. For an image, judge \
+span_x against the frame width at the feature's depth and span_y from far to near.
 - tallest: true for at most one feature, only if the request implies which is tallest.
 - relations: only those the request states or that follow directly from its wording ("a river flowing \
 from the mountains" is flows_from; a river and a lake in the same request is not a relation): left_of, right_of, behind, in_front_of, taller_than, \

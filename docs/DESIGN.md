@@ -251,6 +251,13 @@ gaussian), combined by `blend(height, value, weight, mode)` with modes `add`, `m
 - `raise_peak(center, radius, height, character | steepness, roughness)`: a peak. Must not read as a
   radially symmetric cone: domain-warped outline (lobes) and irregular radial gullies on mid-slopes, with
   the summit height preserved.
+- `raise_ridge(path, width, height, character | steepness, roughness)` (built early, after the M5 image
+  build had cones for ranges): mountain ranges, ridgelines, spurs and long valley flanks.
+  - **Cross-section:** raise_peak's profile along the normal of the smoothed path.
+  - **roughness:** the crest dips into saddles (up to 40% of the height) about every 3 base widths, and
+    the width swells and narrows by up to ±30%.
+  - **Ends:** taper over half the base width.
+  - **Usage:** one raise_ridge per range or flank, raise_peak for summits on it.
 - `raise_region(region, height, mode: add | plateau | basin)`: raise or lower an area; negative height
   lowers; `basin` digs a flat floor below the outline's lowest point (always holds water).
 - `carve_valley(path, width, depth, profile: v | u, character | steepness, roughness)`: river-cut V or glacial U
@@ -363,8 +370,8 @@ validated, clean schema):
 
 ### 5.10 Later ops
 
-- `raise_ridge(path, height, character)` + a graded `carve_valley` (floor descends to its exit): a mountain
-  range becomes ridges + spurs + saddles, not one cone.
+- A graded `carve_valley` (floor descends to its exit); with raise_ridge (§5.5) a mountain range becomes
+  ridges + spurs + saddles, not one cone.
 - `scatter_landforms(kind, region, count, size_range, height_range, min_spacing, distribution, character)`:
   pillar fields, hill clusters, boulders; Poisson-disk spacing; placement from stated relations, solved by
   code (Holodeck-style, §17).
@@ -521,8 +528,9 @@ graph and 3D-GPT's prompt expansion (§17):
 
 **As built in M5** (`agent/spec.py`):
 - **Schema:**
-  - features: `id`, `type`, `position` (text `x`/`y` or image `image_x`/`depth`), `slope`, `winding`,
-    `tallest`, `part_of`, `notes`
+  - features: `id`, `type`, `position` (text `x`/`y` or image `image_x`/`depth`), `span_x`/`span_y`
+    (narrow < 1/3, wide < 2/3, full: how far it reaches west–east and north–south; for an image, span_x is
+    relative to the frame at the feature's depth), `slope`, `winding`, `tallest`, `part_of`, `notes`
   - relations: `left_of`, `right_of`, `behind`, `in_front_of`, `taller_than`, `lower_than`, `flows_from`,
     `reaches`
   - also `materials` and `unsupported`
@@ -681,6 +689,8 @@ renders):
   - `<id>.exists` (an untagged feature fails with "pass feature='<id>'")
   - `<id>.position`: the centroid is in the band
   - `<id>.slope` and `<id>.winding`: one category of slack, one off = minor
+  - `<id>.span_x` and `<id>.span_y`: the body's extent (footprint weight > 0.5) as a share of the area,
+    against the spec class (for images, scaled by the frame width at that depth), one category of slack
   - `<id>.tallest`
   - one item per relation:
     - `left_of`/`right_of`/`behind`/`in_front_of`: centres at least 0.05 apart

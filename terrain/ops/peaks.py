@@ -1,4 +1,4 @@
-"""Peak-shaped terrain ops."""
+"""Peak- and ridge-shaped terrain ops."""
 
 from __future__ import annotations
 
@@ -8,7 +8,8 @@ import numpy as np
 from pydantic import Field
 from scipy.ndimage import map_coordinates
 
-from terrain.brushes import block_grid, blend, circle_distance, length_to_blocks, radial_weight, to_blocks
+from terrain.brushes import (block_grid, blend, circle_distance, length_to_blocks, path_distance, path_wobble,
+                             radial_weight, smooth_path, to_blocks)
 from terrain.noise import fractal_noise
 from terrain.ops.character import SCALES, CharacterParams
 from terrain.ops.registry import Norm, Point, register_op
@@ -95,3 +96,45 @@ def _gullies(state: WorldState, p: RaisePeakParams, rel_dist: np.ndarray) -> np.
     noise = map_coordinates(np.tile(ring, 3), [pos], order=3, mode="wrap")
     t = np.clip(noise * 1.5, 0.0, 1.0)  # only the positive part cuts gullies; the rest stay ridges
     return t * t * (3.0 - 2.0 * t)
+
+
+# raise_ridge: an elongated landform along a path (DESIGN §5.5). Same cross-section as raise_peak along the
+# path's normal; the crest varies into summits and saddles, the width swells and narrows, the ends taper.
+SADDLE_DEPTH = 0.4  # roughness 1 -> saddles dip to 60% of the crest height
+SUMMIT_SPACING = 3.0  # summits/saddles repeat about every 3 base widths along the crest (min 24 blocks)
+RIDGE_WOBBLE = 0.3  # roughness 1 -> the base width varies by up to ±30% along the path
+
+
+class RaiseRidgeParams(CharacterParams):
+    path: list[Point] = Field(min_length=2, max_length=32, description="Crest line as normalized (u, v) points.")
+    height: float = Field(gt=0.0, le=384.0, description="Blocks added along the crest at its highest points.")
+    width: Norm = Field(gt=0.0, description="Base width across both flanks, as a fraction of the area's shorter side.")
+
+
+@register_op("raise_ridge", params=RaiseRidgeParams, stage="terrain")
+def raise_ridge(state: WorldState, p: RaiseRidgeParams) -> WorldState:
+    """Raise a long ridge along a path: mountain ranges, ridgelines, spurs and long valley flanks.
+
+    Use one raise_ridge per range or flank, then raise_peak for individual summits on it. steepness shapes
+    the flanks like raise_peak's (low = broad, high = sharp crest); roughness varies the crest into summits
+    and saddles and lets the width swell and narrow. The ridge tapers at both ends instead of stopping in a
+    wall. Adds height on top of the existing terrain.
+    """
+    points = smooth_path(state, p.path)
+    dist, t = path_distance(state, points)
+    half = length_to_blocks(state, p.width) / 2
+    half_local = half * (1.0 + RIDGE_WOBBLE * p.roughness * path_wobble(state, points, t, half))
+    curve = np.array([to_blocks(state, q) for q in points])
+    length = max(float(np.hypot(*np.diff(curve, axis=0).T).sum()), 1.0)
+    s = t.astype(np.float64) * length  # blocks along the crest
+
+    spacing = max(SUMMIT_SPACING * 2 * half, 24.0)
+    phase = np.random.default_rng(state.seed + 3).uniform(0.0, 2 * np.pi, 2)
+    wave = (np.sin(2 * np.pi * s / spacing + phase[0]) + 0.5 * np.sin(2 * np.pi * s / (0.43 * spacing) + phase[1])) / 1.5
+    crest = 1.0 - SADDLE_DEPTH * p.roughness * (1.0 - wave) / 2.0  # 1 on summits, lower in saddles
+    end = np.clip(np.minimum(s, length - s) / max(half, 1.0), 0.0, 1.0)
+    taper = end * end * (3.0 - 2.0 * end)
+
+    profile = radial_weight(dist, half_local) ** sharpness(p.steepness)
+    state.height = blend(state.height, p.height, crest * taper * profile, "add")
+    return state

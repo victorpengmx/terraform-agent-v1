@@ -28,7 +28,7 @@ WINDING_CLASSES: tuple[tuple[str, float], ...] = (
     ("almost straight", 1.05), ("winding", 1.25), ("twisty", 1.5), ("meandering", math.inf))
 CORE = 0.5  # footprint weight above which a column is the feature's body (the soft edge is excluded)
 FOOTPRINT = 0.02  # weight above which a column belongs to the feature at all
-RAISED = ("peak", "plateau", "raised_area")
+RAISED = ("peak", "ridge", "plateau", "raised_area")
 
 
 def classify(value: float, classes: tuple[tuple[str, float], ...]) -> str:
@@ -68,6 +68,7 @@ class FeatureAttributes:
     sinuosity: float | None = None  # rivers only
     winding: str | None = None
     centroid_uv: tuple[float, float] | None = None  # footprint-weighted centre
+    extent_uv: tuple[float, float] | None = None  # west-east and north-south extent of the body, as area shares
     source_uv: tuple[float, float] | None = None  # rivers: first point of the channel line
     mouth_uv: tuple[float, float] | None = None  # rivers: last point
 
@@ -80,7 +81,7 @@ def feature_type(entry: OpEntry) -> str | None:
         if mode == "add":
             return "raised_area" if p["height"] > 0 else "depression"
         return mode  # plateau | basin
-    return {"raise_peak": "peak", "carve_valley": "valley", "carve_river": "river", "fill_lake": "lake",
+    return {"raise_peak": "peak", "raise_ridge": "ridge", "carve_valley": "valley", "carve_river": "river", "fill_lake": "lake",
             "set_sea_level": "sea"}.get(entry.op)
 
 
@@ -126,8 +127,12 @@ class _Measurer:
             edges=touched_edges(mask > FOOTPRINT),
             prominence=None if prominence is None else float(prominence),
             sinuosity=sinuosity, winding=None if sinuosity is None else classify(sinuosity, WINDING_CLASSES),
-            centroid_uv=centroid, source_uv=source, mouth_uv=mouth,
+            centroid_uv=centroid, source_uv=source, mouth_uv=mouth, extent_uv=self._extent(body),
         )
+
+    def _extent(self, body: np.ndarray) -> tuple[float, float]:
+        zs, xs = np.nonzero(body)
+        return float(xs.max() - xs.min()) / (self.state.width - 1), float(zs.max() - zs.min()) / (self.state.depth - 1)
 
     def _uv(self, xz: np.ndarray) -> tuple[float, float]:
         return float(xz[0]) / (self.state.width - 1), float(xz[1]) / (self.state.depth - 1)

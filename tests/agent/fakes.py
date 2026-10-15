@@ -60,7 +60,7 @@ class ScriptedModel:
 def feature(id: str, type: str = "peak", x: str | None = "any", y: str | None = "any", **kw: Any) -> dict:
     """A spec feature in the SPEC reply format (text position by default)."""
     position = {"x": x, "y": y, "image_x": None, "depth": None} | kw.pop("position", {})
-    return {"id": id, "type": type, "position": position, "slope": None, "winding": None, "tallest": False,
+    return {"id": id, "type": type, "position": position, "span_x": None, "span_y": None, "slope": None, "winding": None, "tallest": False,
             "part_of": None, "notes": ""} | kw
 
 

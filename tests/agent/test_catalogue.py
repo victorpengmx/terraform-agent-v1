@@ -50,7 +50,7 @@ def issue(tool, location="0.5,0.5", op_id=None, **changes):
     (issue("update_op", irregularity="1.2"), "less than or equal to 1"),
     (issue("raise_region", location="0.5,0.5", mode='"ridge"'), "'add', 'plateau' or 'basin'"),
     (issue("update_op", width="0.3"), "raise_peak has no parameter 'width'"),
-    (issue("raise_ridge", location="0.5,0.5"), "unknown tool 'raise_ridge'"),
+    (issue("sculpt_3d", location="0.5,0.5"), "unknown tool 'sculpt_3d'"),
     (issue("update_op", op_id="mountain_9", height="30"), "no op with id 'mountain_9'"),
     (issue("update_op", op_id="0.5,0.5", height="30"), "no op with id '0.5,0.5'"),  # a position is not an op id
     (issue("remove_op", op_id="mountain_1, valley"), "no op with id 'mountain_1, valley'"),

@@ -21,8 +21,8 @@ import numpy as np
 from pydantic import BaseModel
 from scipy.ndimage import distance_transform_edt
 
-from agent.spec import EDGES, FeatureGraph, bands
-from terrain.features import (FOOTPRINT, RAISED_SPEC_TYPES, SLOPE_CLASSES, WALL_SPEC_TYPES, WINDING_CLASSES, FeatureAttributes,
+from agent.spec import EDGES, FeatureGraph, bands, span_classes
+from terrain.features import (FOOTPRINT, classify, RAISED_SPEC_TYPES, SLOPE_CLASSES, WALL_SPEC_TYPES, WINDING_CLASSES, FeatureAttributes,
                               category_distance, measure_spec_feature)
 from terrain.opstack import OpStack
 
@@ -67,7 +67,7 @@ def _attribute_items(f) -> list[str]:
     keys = []
     if bands(f.position) != (0.0, 1.0, 0.0, 1.0):
         keys.append("position")
-    keys += [k for k in ("slope", "winding") if getattr(f, k)]
+    keys += [k for k in ("span_x", "span_y", "slope", "winding") if getattr(f, k)]
     if f.tallest:
         keys.append("tallest")
     return keys
@@ -82,6 +82,15 @@ def _attributes(graph: FeatureGraph, f, a: FeatureAttributes, attrs: dict) -> li
         out.append(Item(id=f"{f.id}.position", text=f"{f.id} lies in u {u0:.2f}-{u1:.2f}, v {v0:.2f}-{v1:.2f}",
                         status="pass" if ok else "fail",
                         detail=f"centre at u={cu:.2f}, v={cv:.2f}" + ("" if ok else "; move its ops into the band")))
+    for axis, key, word in (("x", "span_x", "west-east"), ("y", "span_y", "north-south")):
+        want = getattr(f, key)
+        if want:
+            classes = span_classes(f, axis)
+            share = a.extent_uv[0 if axis == "x" else 1]
+            out.append(_category(f.id, key, want, classify(share, classes), classes,
+                                 f"body spans {share:.0%} of the area {word}",
+                                 (f"make it reach further {word}: a raise_ridge (or a longer path or bigger region) along it",
+                                  f"make it shorter {word}: a shorter path or smaller region")))
     if f.slope:
         stat = "wall slope (90th percentile)" if f.type in WALL_SPEC_TYPES else "mean slope"
         out.append(_category(f.id, "slope", f.slope, a.slope_class, SLOPE_CLASSES, f"{stat} {a.slope_mean:.0f}°",

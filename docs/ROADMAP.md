@@ -80,6 +80,9 @@ Sessions: name the item at the start; check it off and commit when done.
 - [x] `region` polygons include their edges on every side (whole-area polygons missed east-edge columns)
 - [x] Critic: materials in the rubric
 - [ ] Critic: a second L2 angle (`overview_ne`) for critique and comparison
+- [x] `raise_ridge` + spec extent (`span_x`/`span_y`) with checklist items (from the M5 image build)
+- [ ] SPEC reads extent from photos too weakly: valley1.jpg's full-width range came out "wide", and its
+      far-to-near flanks got no span (EVIDENCE 2026-10-25)
 - [x] Critic: a separate `op_id` field for update_op/remove_op fixes
 
 ### M5. Spec and reference images (§9.3, §11.3, §12)
@@ -140,7 +143,7 @@ Pick by benchmark failures, not by appeal.
 - [ ] Second provider adapter; different-family critic and judge (§9.4)
 
 ### C. Tools (§5.10, §5.11, §6)
-- [ ] `raise_ridge` + graded `carve_valley`; mountain-range recipe
+- [ ] Graded `carve_valley`; mountain-range recipe (`raise_ridge` done early, M4.5)
 - [ ] Vanilla-style defaults; badlands palette preset (§6.3)
 - [ ] Water hard cases: shallow fringes, river vs. lake, stepped-pool waterfalls
 - [ ] `exclude` on `region`; minimum feature sizes (§6.2)
