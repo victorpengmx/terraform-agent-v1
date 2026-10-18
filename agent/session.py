@@ -11,6 +11,7 @@ from typing import Any, Callable, Sequence
 import numpy as np
 
 from terrain.config import MAX_MEAN_DH
+from terrain.materials import active_rules, rule_coverage, rule_text
 from terrain.ops import OpError, get_op
 from terrain.ops.region import region_shape
 from terrain.ops.registry import validate_params
@@ -96,7 +97,7 @@ class Session:
         form goes into summaries, which every episode and critique repeat.
         """
         if get_op(e.op).stage == "materials":
-            return f"surface blocks only, no height or water change ({self._material_effect(e)})"
+            return f"surface blocks only, no height or water change ({self._material_effect(e, detail)})"
         f = self.state.features.get(e.id)
         if f is None:
             return "no height or water change"
@@ -118,14 +119,45 @@ class Session:
             parts.append(f"water on {int(wet.sum()):,} columns, surface y={np.nanmin(s.water[wet]):.0f}..{np.nanmax(s.water[wet]):.0f}")
         return "; ".join(parts)
 
-    def _material_effect(self, e: OpEntry) -> str:
+    def _material_effect(self, e: OpEntry, detail: bool = False) -> str:
         if e.op == "paint_region":
             inside, _ = region_shape(self.state, validate_params(e.op, e.params).region)
             return f"{int(inside.sum())} columns set to {e.params['block']}; block colours show only in L2 renders"
         if e.op == "set_palette_rules":
             n = len(e.params["rules"])
-            return f"{n} palette rule{'' if n == 1 else 's'}; block colours show only in L2 renders"
+            text = f"{n} palette rule{'' if n == 1 else 's'}"
+            latest = [x for x in self.stack.entries if x.op == "set_palette_rules"][-1]
+            if latest.id != e.id:
+                return f"{text}; replaced by {latest.id} (only the latest set_palette_rules applies)"
+            return "; ".join([text, *self._palette_report(detail), "block colours show only in L2 renders"])
         return "block colours show only in L2 renders"
+
+    def _palette_report(self, detail: bool) -> list[str]:
+        """Warnings for rules that decide little of the ground they match (rule order, paint), plus in `detail`
+        (tool results) every rule's share of the area. Rules are numbered from 1, as the builder lists them."""
+        rules, cover = active_rules(self.state), rule_coverage(self.state)
+        total = self.state.width * self.state.depth
+        out = []
+        if detail:
+            shares = [f"rule {i + 1} ({rule_text(r)}) {c.won / total:.0%}" for i, (r, c) in enumerate(zip(rules[:-1], cover))]
+            if cover[-1].won:
+                shares.append(f"no rule matches {cover[-1].won / total:.0%} (stone)")
+            if painted := int((self.state.material > 0).sum()):
+                shares.append(f"paint_region {painted / total:.0%}")
+            out.append("area shares: " + ", ".join(shares))
+        for i, (r, c) in enumerate(zip(rules[:-1], cover)):
+            name = f"rule {i + 1} ({rule_text(r)})"
+            if c.matched == 0:
+                out.append(f"WARNING: {name} matches no column")
+            elif c.won == 0 or (r.when.feature is not None and c.won < c.matched / 2):
+                k, n = max(c.taken_by.items(), key=lambda kv: kv[1])
+                lead = f"WARNING: {name} decides {c.won / c.matched:.0%} of the ground it matches; "
+                if k == "paint":
+                    out.append(lead + f"paint_region covers {n / c.matched:.0%} of it")
+                else:
+                    out.append(lead + f"earlier rule {k + 1} ({rule_text(rules[k])}) takes {n / c.matched:.0%}: move rule "
+                               f"{i + 1} above rule {k + 1} (with its own slope limits) to cover that ground")
+        return out
 
     def stats(self) -> str:
         return terrain_stats(self.state)

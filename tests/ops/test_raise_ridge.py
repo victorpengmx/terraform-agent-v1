@@ -1,4 +1,4 @@
-"""Invariant tests for raise_ridge: crest along the path, bounded height and width, tapered ends, saddles."""
+"""Invariant tests for raise_ridge: crest along the path, height = highest summit, bounded width, rounded ends, cols."""
 
 import numpy as np
 import pytest
@@ -26,15 +26,15 @@ def test_crest_follows_the_path_and_reaches_the_height_without_roughness():
 
 def test_nothing_changes_beyond_the_widest_flank():
     s = ridge(roughness=1.0)
-    half_max = 0.2 * (N - 1) / 2 * 1.3  # half width plus the largest wobble
-    far = np.abs(np.arange(N) - 64) > half_max + 1
+    half = 0.2 * (N - 1) / 2  # the footprint is exactly the base width
+    far = np.abs(np.arange(N) - 64) > half + 1
     assert np.all(s.height[far, :] == BASE)
 
 
-def test_ends_taper_instead_of_stopping_in_a_wall():
-    dh = ridge(roughness=0.0).height - BASE
-    crest = dh[64]
-    assert crest[13] < 0.2 * 40 and crest[20] < crest[40] and crest[115] < 0.2 * 40  # path ends at x = 12.8 and 115.2
+def test_ends_round_off_instead_of_stopping_in_a_wall():
+    crest = ridge(roughness=0.0).height[64] - BASE  # path ends at x = 12.8 and 115.2; half width 12.8 blocks
+    assert crest[0] == 0 and crest[-1] == 0 and crest[13] == pytest.approx(40, abs=0.5)
+    assert 0 < crest[5] < 30  # the end cap slopes down over the half width beyond the endpoint
     assert np.abs(np.diff(crest)).max() < 6  # no cliff at the ends
 
 
@@ -42,6 +42,11 @@ def test_roughness_makes_summits_and_saddles_along_the_crest():
     smooth, rough = ridge(roughness=0.0).height[64, 35:95] - BASE, ridge(roughness=0.9).height[64, 35:95] - BASE
     assert np.ptp(smooth) < 0.5 and np.ptp(rough) > 8
     assert rough.max() <= 40 + 1e-3  # saddles only lower the crest
+
+
+@pytest.mark.parametrize("roughness", [0.0, 0.5, 1.0])
+def test_height_is_the_highest_summit(roughness):
+    assert (ridge(roughness=roughness).height - BASE).max() == pytest.approx(40, abs=1e-3)
 
 
 def test_steepness_narrows_the_flanks():

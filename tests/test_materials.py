@@ -1,7 +1,7 @@
 import numpy as np
 import pytest
 
-from terrain.materials import SURFACE_BLOCKS, Banded, Condition, Mix, Rule, Single, resolve_surface
+from terrain.materials import SURFACE_BLOCKS, Banded, Condition, Mix, Rule, Single, resolve_surface, rule_coverage, rule_text
 from terrain.ops import OpError, apply_op
 from terrain.opstack import BaseSpec, OpStack
 from terrain.state import WorldState
@@ -199,3 +199,48 @@ def test_default_cliffs_are_patches_not_bands():
     from terrain.materials import DEFAULT_RULES
 
     assert not any(isinstance(r.use, Banded) for r in DEFAULT_RULES)
+
+
+def _ridge_with_palette(rules):
+    stack = OpStack(BaseSpec(N, N, 64))
+    stack.add("raise_peak", {"center": [0.5, 0.5], "radius": 0.3, "height": 40, "steepness": 0.9}, id="hill")
+    stack.add("set_palette_rules", {"rules": rules})
+    return stack.state
+
+
+STEEP_STONE_RULE = {"when": {"slope_min": 40}, "use": {"kind": "single", "block": "stone"}}
+HILL_MOSS_RULE = {"when": {"feature": "hill"}, "use": {"kind": "single", "block": "moss_block"}}
+GRASS_RULE = {"use": {"kind": "single", "block": "grass_block"}}
+
+
+def test_rule_coverage_names_the_earlier_rule_that_shadows_a_feature_rule():
+    cover = rule_coverage(_ridge_with_palette([STEEP_STONE_RULE, HILL_MOSS_RULE, GRASS_RULE]))
+    assert len(cover) == 4  # three rules plus the stone fallback
+    moss = cover[1]
+    assert 0 < moss.won < moss.matched and set(moss.taken_by) == {0}
+    assert moss.won + moss.taken_by[0] == moss.matched
+    first = rule_coverage(_ridge_with_palette([HILL_MOSS_RULE, STEEP_STONE_RULE, GRASS_RULE]))[0]
+    assert first.won == first.matched and first.taken_by == {}
+
+
+def test_rule_coverage_counts_paint_and_rules_that_match_nothing():
+    state = _ridge_with_palette([{"when": {"y_min": 300}, "use": {"kind": "single", "block": "snow_block"}}, GRASS_RULE])
+    assert rule_coverage(state)[0].matched == 0
+    stack = OpStack(BaseSpec(N, N, 64))
+    stack.add("set_palette_rules", {"rules": [GRASS_RULE]})
+    stack.add("paint_region", {"region": {"polygon": [[0, 0], [0.5, 0], [0.5, 0.5], [0, 0.5]]}, "block": "gravel"})
+    grass = rule_coverage(stack.state)[0]
+    assert grass.taken_by["paint"] > 0 and grass.won + grass.taken_by["paint"] == N * N
+
+
+def test_resolve_surface_unchanged_by_the_coverage_refactor():
+    state = _ridge_with_palette([STEEP_STONE_RULE, HILL_MOSS_RULE, GRASS_RULE])
+    owner = resolve_surface(state).rule_index
+    cover = rule_coverage(state)
+    assert [int((owner == i).sum()) for i in range(4)] == [c.won for c in cover]
+
+
+def test_rule_text_is_short_and_complete():
+    assert rule_text(Rule.model_validate(STEEP_STONE_RULE)) == "slope >= 40 -> stone"
+    assert rule_text(Rule(when=Condition(feature="hill", y_max=90.5), use=Mix(blocks={"grass_block": 1, "podzol": 1})))         == "y <= 90.5, feature hill -> grass_block/podzol"
+    assert rule_text(Rule.model_validate(GRASS_RULE)) == "everywhere -> grass_block"

@@ -84,6 +84,8 @@ Sessions: name the item at the start; check it off and commit when done.
 - [ ] SPEC reads extent from photos too weakly: valley1.jpg's full-width range came out "wide", and its
       far-to-near flanks got no span (EVIDENCE 2026-10-25)
 - [x] Critic: a separate `op_id` field for update_op/remove_op fixes
+- [x] Palette: rule coverage report (shadowed rules), vegetated steep slopes in the tool text, materials
+      rubric per landform against the reference (from the valley1.jpg build's stone right ridge)
 
 ### M5. Spec and reference images (§9.3, §11.3, §12)
 

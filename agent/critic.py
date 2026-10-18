@@ -260,11 +260,15 @@ deliberate and balanced.
 spacing), 3 = plausible, 5 = convincing.
 - minecraft_quality: block-scale quality: no spikes, no floating water, walkable transitions where \
 expected. 1 = broken, 3 = minor artifacts, 5 = clean.
-- materials: the surface blocks, judged in the 3D render: do they suit each landform and the spec (rock \
-where it is steep or high, soil and grass where it is gentle, sand or gravel at water), and do they vary \
-naturally? 1 = wrong or one block everywhere, 3 = plausible with artifacts (rings or stripes of one block, \
-bare stone walls, abrupt switches at one slope), 5 = convincing. Fix materials with set_palette_rules or \
-paint_region.
+- materials: the surface blocks, judged in the 3D render: do they suit each landform and each part of the \
+scene (wherever it is: either side, background or foreground, summits or lower slopes), and do they vary \
+naturally? With a reference, compare every landform's surface with what the reference shows at that place, \
+not only those the spec gives a material for: slopes the reference shows green stay vegetated even when \
+steep, and rock belongs where it shows bare rock. Without one, rock suits steep or high ground, soil and \
+grass gentle ground, sand or gravel the water's edge. 1 = wrong or one block everywhere, 3 = plausible with \
+artifacts (rings or stripes of one block, bare stone walls, abrupt switches at one slope), 5 = convincing. \
+Fix materials with set_palette_rules or paint_region; a palette WARNING in the op list (a rule mostly \
+overridden by an earlier rule) is fixed by reordering the rules.
 - reference_match: how well the terrain matches the reference images, null if there are none. The photo is a \
 perspective view; the 3D render is from the south-west corner, so compare the main landforms, their \
 arrangement (left/right, near/far), proportions, mood and palette, not exact geometry.

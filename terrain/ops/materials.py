@@ -17,7 +17,9 @@ class SetPaletteRulesParams(OpParams):
         min_length=1, max_length=16,
         description="Evaluated per surface column in order; the first rule whose conditions all hold wins. "
         "Put specific rules (cliffs, shores, a feature) before general ones and end with a rule without "
-        "conditions. Columns no rule matches get stone. How the blocks look (approximate colour): "
+        "conditions. A feature rule placed after a slope or height rule only gets the part of the feature "
+        "that rule leaves; to give a whole feature its own look, put its rule first, with its own slope limits. "
+        "Columns no rule matches get stone. How the blocks look (approximate colour): "
         + BLOCK_LOOKS_TEXT + ".",
     )
 
@@ -27,7 +29,10 @@ def set_palette_rules(state: WorldState, p: SetPaletteRulesParams) -> WorldState
     """Replace the surface palette: which blocks cover slopes, cliffs, shores, peaks or named features.
 
     Use banded for layered rock walls, mix for natural patchy ground, single for uniform surfaces.
-    Replaces the default palette entirely; only the latest set_palette_rules applies.
+    Steep is not always rock: slopes that are green in the request or reference (forested or grassy
+    mountainsides) stay vegetated, e.g. a mix of grass_block, moss_block and podzol with a little stone; keep
+    bare rock for faces shown bare. Replaces the default palette entirely; only the latest set_palette_rules
+    applies. The result lists each rule's share and warns about rules that earlier rules or paint override.
     """
     known = set(known_features(state))
     for i, rule in enumerate(p.rules):

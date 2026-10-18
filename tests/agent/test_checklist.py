@@ -159,3 +159,12 @@ def test_extent_passes_for_a_full_width_ridge_and_fails_for_a_single_cone():
     assert got["range_1.span_x"].status == "pass"
     cone = got["range_2.span_x"]
     assert cone.status == "fail" and cone.severity == "major" and "raise_ridge" in cone.detail
+
+
+def test_tallest_is_not_compared_with_the_range_it_belongs_to():
+    s = Session.flat(129, 129, base_y=64)
+    s.apply("raise_ridge", {"path": [[0.05, 0.2], [0.95, 0.2]], "width": 0.3, "height": 50}, feature="range_1")
+    s.apply("raise_peak", PEAK | {"center": [0.5, 0.2], "radius": 0.1, "height": 10}, feature="peak_1")
+    s.apply("raise_peak", PEAK | {"center": [0.5, 0.8], "radius": 0.1, "height": 20}, feature="hill_1")
+    g = graph(feature("range_1", "mountain_range"), feature("peak_1", tallest=True, part_of="range_1"), feature("hill_1", "hills"))
+    assert items(g, s)["peak_1.tallest"].status == "pass"  # its range shares its summit; the separate hill is lower

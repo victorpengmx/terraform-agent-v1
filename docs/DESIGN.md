@@ -253,11 +253,16 @@ gaussian), combined by `blend(height, value, weight, mode)` with modes `add`, `m
   the summit height preserved.
 - `raise_ridge(path, width, height, character | steepness, roughness)` (built early, after the M5 image
   build had cones for ranges): mountain ranges, ridgelines, spurs and long valley flanks.
-  - **Cross-section:** raise_peak's profile along the normal of the smoothed path.
-  - **roughness:** the crest dips into saddles (up to 40% of the height) about every 3 base widths, and
-    the width swells and narrows by up to ±30%.
-  - **Ends:** taper over half the base width.
-  - **Usage:** one raise_ridge per range or flank, raise_peak for summits on it.
+  - **Model (reworked 2026-10-25):** the range recipe behind the reference range at (950, -400) in
+    TerraformTest, as one op.
+  - **Cross-section:** a narrow spine (6% of the half width) with smoothstep flanks over the rest of the
+    width. Steepness changes the flank exponent; at `rugged` it is exactly the recipe's fade.
+  - **Summits and cols:** large-scale ridged noise (scale ≈ 0.64 × width), weighted by height and confined
+    to the footprint. roughness sets its amplitude, 0.6 of the spine at `rugged`.
+  - **Height:** the result is rescaled so the highest summit adds exactly `height`.
+  - **Ends:** round off over the half width beyond the path's ends.
+  - **Finishing:** erosion, crags and the palette stay separate ops, and the tool description names that
+    order.
 - `raise_region(region, height, mode: add | plateau | basin)`: raise or lower an area; negative height
   lowers; `basin` digs a flat floor below the outline's lowest point (always holds water).
 - `carve_valley(path, width, depth, profile: v | u, character | steepness, roughness)`: river-cut V or glacial U
@@ -345,6 +350,20 @@ validated, clean schema):
 
   Rock share by slope on constant-slope ramps: 20° 0%, 30° 15%, 40° 34%, 50° 42%, 60° 68%, 70°+ 100%.
   Before this change it jumped at 35° and 50°.
+- **Rule coverage report** (`terrain/materials.py` `rule_coverage`, formatted in `agent/session.py`):
+  first-match-wins makes rule order a trap. In the valley1.jpg build, `slope >= 42 -> stone` came before
+  `feature right_ridge_1 -> podzol`, so the forested wall came out mostly stone (EVIDENCE 2026-10-28).
+  - The set_palette_rules result lists every rule's share of the area (and paint's).
+  - Summaries, which every episode and critique repeat, show only warnings:
+    - a rule matching no column
+    - a rule deciding no column
+    - a feature rule deciding under half of the ground it matches
+
+    Each warning names what overrides it: the earlier rule, with "move rule N above rule K", or
+    paint_region.
+  - It reports and doesn't block: a deliberately shadowed rule is legal.
+- **Steep is not always rock:** the tool text says slopes shown green in the request or reference stay
+  vegetated (grass, moss, podzol with a little stone). Bare rock is for faces shown bare.
 - [Later] `apply_palette_preset(style)` (temperate, alpine, badlands, karst) if traces show long or invalid
   rule calls.
 
@@ -636,7 +655,9 @@ GPT-4V's referring-expression accuracy on RefCOCOg from 25.7 to 86.4. We control
 - **Programmatic checks first** (cheap, objective); blocking failures skip the model call.
 - Rubric 1–5 with level descriptions: prompt_adherence, layout, naturalism, minecraft_quality, materials
   (surface blocks suit each landform and the spec and vary naturally; judged in the 3D render; added in
-  M4.5), reference_match (null without references). The critic also sees the palette in use, and the
+  M4.5. Since 2026-10-28 it covers every landform and part of the scene, wherever it is, compared with what
+  the reference shows at that place: steep slopes shown green stay vegetated. "Rock on steep ground" is only
+  the rule of thumb without a reference), reference_match (null without references). The critic also sees the palette in use, and the
   catalogue gives the rule format, so material fixes are complete `set_palette_rules` calls. Structured output (strict JSON schema), issues before scores
   so the model reasons before rating. Each issue is located (op id or u,v) with a concrete fix hint naming
   a tool and parameter. Verdict "pass" only with no major issues and all scores ≥ 4.

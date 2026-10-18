@@ -56,6 +56,20 @@ def test_material_ops_say_what_they_changed(session):
     assert "no visible change" not in session.summary() and "scree: paint_region" in session.summary()
 
 
+def test_palette_result_warns_about_a_shadowed_feature_rule(session):
+    tools = {t.name: t for t in op_tools(session)}
+    execute(tools, tool_use("raise_peak", {"center": [0.5, 0.5], "radius": 0.3, "height": 40, "steepness": 0.9, "id": "hill"}))
+    rules = [{"when": {"slope_min": 40}, "use": {"kind": "single", "block": "stone"}},
+             {"when": {"feature": "hill"}, "use": {"kind": "single", "block": "moss_block"}},
+             {"use": {"kind": "single", "block": "grass_block"}}]
+    result = execute(tools, tool_use("set_palette_rules", {"rules": rules, "id": "palette"}))["content"]
+    assert "area shares: rule 1 (slope >= 40 -> stone)" in result
+    assert "WARNING: rule 2 (feature hill -> moss_block)" in result and "move rule 2 above rule 1" in result
+    assert "WARNING: rule 2" in session.summary() and "area shares" not in session.summary()  # compact form
+    execute(tools, tool_use("set_palette_rules", {"rules": [rules[1], rules[0], rules[2]], "id": "palette_2"}))
+    assert "WARNING" not in session.summary() and "replaced by palette_2" in session.summary()
+
+
 def test_execute_unknown_tool(session):
     result = execute({}, tool_use("nope", {}))
     assert result["is_error"] is True and "unknown tool" in result["content"]

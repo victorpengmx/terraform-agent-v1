@@ -107,8 +107,11 @@ def _attributes(graph: FeatureGraph, f, a: FeatureAttributes, attrs: dict) -> li
                       "straighten its carve_valley path (fewer or smaller sideways offsets)"))
             out.append(_category(f.id, "winding", f.winding, a.winding, WINDING_CLASSES, f"sinuosity {a.sinuosity:.2f}", hints))
     if f.tallest:
+        # Not against the feature it is part of, or its own parts: their footprints contain each other, so their
+        # tops are the same summit (a tallest peak of a range could otherwise never pass).
         others = {g.id: attrs[g.id].top_y for g in graph.features
-                  if g.id != f.id and g.type in RAISED_SPEC_TYPES and attrs.get(g.id) is not None}
+                  if g.id != f.id and g.type in RAISED_SPEC_TYPES and attrs.get(g.id) is not None
+                  and g.id != f.part_of and g.part_of != f.id}
         rival = max(others.items(), key=lambda kv: kv[1], default=None)
         ok = rival is None or a.top_y > rival[1]
         out.append(Item(id=f"{f.id}.tallest", text=f"{f.id} is the tallest", status="pass" if ok else "fail",

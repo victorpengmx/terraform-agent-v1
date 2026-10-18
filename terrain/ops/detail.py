@@ -63,32 +63,41 @@ class RoughenParams(AreaParams):
 def roughen(state: WorldState, p: RoughenParams) -> WorldState:
     """Add natural surface detail: crags and jagged ridgelines (ridged), rolling bumps (fbm) or lumps
     (billow). Use after sculpting a smooth shape; weight by relief to roughen peaks more than valleys."""
+    noise = detail_noise(state, p.scale, p.style)
+    mask = region_weight(state, p.region, length_to_blocks(state, p.edge))
+    h = state.height
+    state.height = (h + p.amount * noise * detail_strength(h, mask, p.weight) * mask).astype(np.float32)
+    return state
+
+
+def detail_noise(state: WorldState, scale: float, style: str) -> np.ndarray:
+    """Multi-octave noise in [-1, 1] (largest magnitude exactly 1), from `scale` down to 4-block features
+    (finer ones only make pillars). ridged: sharp crests, round troughs; billow: round lumps; fbm: bumps.
+    Shared by roughen and raise_ridge (whose summits and cols are this noise, ridged)."""
     total = np.zeros(state.height.shape)
-    norm, w_k, size = 0.0, 1.0, p.scale
-    for k in range(detail_octaves(state, p.scale)):  # down to 4-block bumps; finer ones only make pillars
+    norm, w_k, size = 0.0, 1.0, scale
+    for k in range(detail_octaves(state, scale)):
         n = fractal_noise(state, size, octaves=1, roughness=0.5, seed=state.seed + k)
-        if p.style == "ridged":
+        if style == "ridged":
             layer = 2.0 * (1.0 - np.abs(n)) ** 2 - 1.0
-        elif p.style == "billow":
+        elif style == "billow":
             layer = 2.0 * np.abs(n) - 1.0
         else:
             layer = n
         total += w_k * layer
         norm += w_k
         w_k, size = w_k * 0.5, size / 2
-    noise = _full_range(total / norm)
+    return _full_range(total / norm)
 
-    mask = region_weight(state, p.region, length_to_blocks(state, p.edge))
-    h = state.height
-    if p.weight == "relief":
+
+def detail_strength(h: np.ndarray, mask: np.ndarray, weight: str) -> np.ndarray | float:
+    """Where detail applies fully: relief = higher ground (within the masked area), slope = steeper ground."""
+    if weight == "relief":
         sel = mask > 0.5
         lo = float(np.percentile(h[sel], 5)) if sel.any() else float(h.min())
         hi = float(h[sel].max()) if sel.any() else float(h.max())
-        strength = np.clip((h - lo) / max(hi - lo, 1e-6), 0.0, 1.0)
-    elif p.weight == "slope":
+        return np.clip((h - lo) / max(hi - lo, 1e-6), 0.0, 1.0)
+    if weight == "slope":
         gz, gx = np.gradient(h.astype(np.float64))
-        strength = np.clip(np.degrees(np.arctan(np.hypot(gx, gz))) / 60.0, 0.0, 1.0)
-    else:
-        strength = 1.0
-    state.height = (h + p.amount * noise * strength * mask).astype(np.float32)
-    return state
+        return np.clip(np.degrees(np.arctan(np.hypot(gx, gz))) / 60.0, 0.0, 1.0)
+    return 1.0

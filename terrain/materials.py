@@ -173,18 +173,71 @@ class SurfacePlan:
         return out
 
 
-def resolve_surface(state: WorldState) -> SurfacePlan:
+def active_rules(state: WorldState) -> list[Rule]:
+    """The palette in force (the latest set_palette_rules, else the defaults), ending with the stone fallback."""
     rules = [Rule.model_validate(r) for r in state.palette_rules] if state.palette_rules is not None else list(DEFAULT_RULES)
-    rules.append(FALLBACK)
+    return [*rules, FALLBACK]
+
+
+def _rule_matches(state: WorldState, rules: list[Rule]) -> list[np.ndarray]:
+    """Per rule, the columns its own conditions accept (ignoring earlier rules)."""
     slope, water_dist = surface_metrics(state)
     y = np.round(state.height)
-    shape = state.height.shape
+    return [_matches(rule.when, state, slope, y, water_dist, zlib.crc32(f"{state.seed}:fuzz:{i}".encode()))
+            for i, rule in enumerate(rules)]
 
-    rule_index = np.full(shape, -1, dtype=int)
-    for i, rule in enumerate(rules):
-        fuzz_seed = zlib.crc32(f"{state.seed}:fuzz:{i}".encode())
-        match = _matches(rule.when, state, slope, y, water_dist, fuzz_seed) & (rule_index < 0)
-        rule_index[match] = i
+
+def _first_match(matches: list[np.ndarray]) -> np.ndarray:
+    rule_index = np.full(matches[0].shape, -1, dtype=int)
+    for i, match in enumerate(matches):
+        rule_index[match & (rule_index < 0)] = i
+    return rule_index
+
+
+@dataclass(frozen=True)
+class RuleCoverage:
+    """How much of the surface one palette rule decides, and who decides the rest of the ground it matches."""
+
+    matched: int  # columns its conditions accept
+    won: int  # columns whose block it decides (first match, not painted over)
+    taken_by: dict[int | str, int]  # matched columns decided elsewhere: an earlier rule's index, or "paint"
+
+
+def rule_coverage(state: WorldState) -> list[RuleCoverage]:
+    """Coverage of every rule in `active_rules` (the fallback last). Rule order is the usual trap: a feature
+    rule after a slope rule only gets the feature's ground the slope rule leaves (EVIDENCE 2026-10-28)."""
+    matches = _rule_matches(state, active_rules(state))
+    owner = _first_match(matches)
+    painted = state.material > 0
+    out = []
+    for i, match in enumerate(matches):
+        taken: dict[int | str, int] = {}
+        if n := int((match & painted).sum()):
+            taken["paint"] = n
+        lost = owner[match & ~painted]
+        for k, n in zip(*np.unique(lost[lost != i], return_counts=True)):
+            taken[int(k)] = int(n)
+        out.append(RuleCoverage(int(match.sum()), int((match & ~painted & (owner == i)).sum()), taken))
+    return out
+
+
+def rule_text(rule: Rule) -> str:
+    """A rule in a few words, e.g. 'slope >= 42 -> stone', for tool results and critiques."""
+    c, parts = rule.when, []
+    for key, word in (("slope_min", "slope >= {}"), ("slope_max", "slope <= {}"), ("y_min", "y >= {}"),
+                      ("y_max", "y <= {}"), ("water_dist_max", "within {} of water"), ("feature", "feature {}")):
+        if (v := getattr(c, key)) is not None:
+            parts.append(word.format(f"{v:g}" if isinstance(v, float) else v))
+    use = rule.use
+    blocks = use.block if isinstance(use, Single) else "/".join(use.blocks)
+    return f"{', '.join(parts) or 'everywhere'} -> {blocks}"
+
+
+def resolve_surface(state: WorldState) -> SurfacePlan:
+    rules = active_rules(state)
+    y = np.round(state.height)
+    shape = state.height.shape
+    rule_index = _first_match(_rule_matches(state, rules))
 
     column_block = np.full(shape, "", dtype=object)
     band_tables: dict[int, tuple[np.ndarray, int]] = {}
