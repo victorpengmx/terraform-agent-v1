@@ -798,7 +798,11 @@ orders) must pick the intact one. Tools: `scripts/gate_stats.py` (win rates from
   - **Structured fix:** each issue states its fix as `tool` (an op, `update_op`, `remove_op` or `"none"`) and
     `changes` (param, JSON value), next to the free-text `fix_hint`. `update_op`/`remove_op`
     fixes name their target in `op_id`; `location` stays an op id or a u,v position.
-  - **Validation:** `hint_problems` checks a fix against the schemas (tool, op id, parameter, value).
+  - **Validation:** `hint_problems` checks a fix against the schemas (tool, op id, parameter, value). Since
+    2026-10-29 every critique runs it against the stack it judged (`CritiqueResult.fix_problems`); the
+    builder sees an invalid fix as "(fix not applicable as written: <problem>)" instead of its parameters,
+    with the description and hint kept, and each critique record traces `scores.fixes` (issues, with a
+    fix, valid, tool "none") for M6's fix-validity rate.
   - **Builder:** the builder sees the structured fix after the hint.
   - **Missing tools:** `scripts/missing_tools.py` ranks `"none"` issues across traces.
   - **A/B:** `scripts/catalogue_ab.py` re-critiques saved runs with and without the catalogue (EVIDENCE

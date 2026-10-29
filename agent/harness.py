@@ -250,11 +250,13 @@ def _critique(run: _Run, critic: Critic, spec: dict, stage: str, render: Rendere
             continue
         if response is not None:
             _charge(run, response)
-        _trace(run, f"{stage}/critique", response, scores=critique.model_dump(), note=f"score {critique.score:.2f}, {critique.verdict}")
+        _trace(run, f"{stage}/critique", response, scores=critique.model_dump() | {"fixes": critique.fix_stats()},
+               note=f"score {critique.score:.2f}, {critique.verdict}")
         return critique
     critique = CritiqueResult(checks=critic.run_checks(run.session), checklist=spec_checklist(spec, run.session),
                               verdict="revise", failed=error)
-    _trace(run, f"{stage}/critique", scores=critique.model_dump(), note="critic failed twice; round recorded with checks only")
+    _trace(run, f"{stage}/critique", scores=critique.model_dump() | {"fixes": critique.fix_stats()},
+           note="critic failed twice; round recorded with checks only")
     return critique
 
 

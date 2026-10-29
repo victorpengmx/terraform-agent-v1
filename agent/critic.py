@@ -102,6 +102,14 @@ class CritiqueResult(BaseModel):
     verdict: Literal["pass", "revise"]
     failed: str | None = None  # why the critic model gave no usable critique this round (checks still ran)
     checklist: list[Item] = []  # spec checklist (DESIGN §11.3), computed by code; empty without a feature graph
+    fix_problems: list[list[str]] = []  # per issue: why its structured fix can't be applied as written (hint_problems)
+
+    def fix_stats(self) -> dict[str, int]:
+        """Structured-fix validity for reports: issues, those naming a tool, those valid as written, tool "none"."""
+        problems = self.fix_problems or [[] for _ in self.issues]
+        with_fix = [p for i, p in zip(self.issues, problems) if i.tool != "none"]
+        return {"issues": len(self.issues), "with_fix": len(with_fix), "valid": sum(not p for p in with_fix),
+                "none": len(self.issues) - len(with_fix)}
 
     @property
     def checklist_passes(self) -> int:
@@ -144,7 +152,10 @@ class CritiqueResult(BaseModel):
             lines.append(checklist_summary(self.checklist))
         if self.issues:
             lines.append("Issues:")
-            lines += [f"- [{i.severity}] at {i.location}: {i.description} Fix: {i.fix_hint}{_fix_text(i)}" for i in self.issues]
+            problems = self.fix_problems or [[] for _ in self.issues]
+            lines += [f"- [{i.severity}] at {i.location}: {i.description} Fix: {i.fix_hint}"
+                      + (f" (fix not applicable as written: {'; '.join(p)})" if p else _fix_text(i))
+                      for i, p in zip(self.issues, problems)]
         return "\n".join(lines)
 
 
@@ -427,7 +438,11 @@ class Critic:
         failed_major = any(not c.passed and c.severity == "major" for c in checks)
         failed_major |= any(i.status == "fail" and i.severity == "major" for i in items)
         verdict = "revise" if failed_major else out.verdict
-        return CritiqueResult(checks=checks, issues=out.issues, scores=out.scores, verdict=verdict, checklist=items), response
+        # Every fix is checked against the stack it was written for, so the builder never gets one that
+        # names a missing op, parameter or invalid value (DESIGN §11.5).
+        problems = [hint_problems(i, session.stack) for i in out.issues]
+        return CritiqueResult(checks=checks, issues=out.issues, scores=out.scores, verdict=verdict, checklist=items,
+                              fix_problems=problems), response
 
     def compare(
         self, spec: dict, first: AttemptView, second: AttemptView, references: list[bytes] | None = None
