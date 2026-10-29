@@ -502,7 +502,10 @@ class WorldBackend(ABC):
 Model call → execute tool calls → feed back results or errors, until the model ends its turn, a budget
 stops it or it refuses. Handle every stop reason explicitly: `tool_use`; `end_turn`; `max_tokens`
 (truncated tool calls are not run; ask for a re-issue); `pause_turn` (resend); `refusal`. Budgets: model
-calls (builder + critic), cost, wall time; critique rounds. Agent-fixable problems come back as error tool
+calls (builder + critic), cost, wall time; critique rounds. The budget is checked before every model call:
+each builder call, each critique and comparison, and each of their retries. When it runs out before a
+critic or comparison call, the run stops with `budget: …` on the latest accepted attempt; an unjudged
+revision is never kept, and a round-1 build ends uncritiqued. Agent-fixable problems come back as error tool
 results; any other exception is a bug and propagates.
 
 ### 9.3 Plan and spec: the feature graph [MVP v1; extensions Later]

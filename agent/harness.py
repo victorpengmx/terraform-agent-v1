@@ -132,12 +132,16 @@ def run_task(
             result.stop = outcome.stop
             break
 
-        attempt = Attempt(round_no, session.snapshot(), _critique(run, critic, spec, stage, render, images))
-        result.critiques.append(attempt.critique)
-        if accepted is None:
-            keep, why = True, "first attempt (baseline)"
-        else:
-            keep, why = _gate(run, critic, spec, stage, render, images, accepted, attempt, compare_both_orders)
+        try:
+            attempt = Attempt(round_no, session.snapshot(), _critique(run, critic, spec, stage, render, images))
+            result.critiques.append(attempt.critique)
+            if accepted is None:
+                keep, why = True, "first attempt (baseline)"
+            else:
+                keep, why = _gate(run, critic, spec, stage, render, images, accepted, attempt, compare_both_orders)
+        except _OutOfBudget as e:  # an unjudged revision is never kept; round 1 ends on the built terrain
+            result.stop = f"budget: {e}"
+            break
 
         if keep:
             accepted, rollback = attempt, None
@@ -237,9 +241,12 @@ def _spec(run: _Run, prompt: str, images: list[bytes]) -> FeatureGraph | None:
 def _critique(run: _Run, critic: Critic, spec: dict, stage: str, render: Renderer | None, references: list[bytes]) -> CritiqueResult:
     """Critique the current terrain. An unusable critic reply is retried once; a second failure records a
     failed round (programmatic checks only) instead of crashing the run."""
+    _check_budget(run, f"{stage}/critique", "critique")
     renders = render(run.session.state, f"{len(run.session.ops)} ops") if render else []
     error = ""
     for attempt in (1, 2):
+        if attempt == 2:
+            _check_budget(run, f"{stage}/critique", "critique retry")
         try:
             critique, response = critic.critique(spec, run.session, renders=renders, references=references)
         except CriticError as e:
@@ -284,6 +291,7 @@ def _gate(run: _Run, critic: Critic, spec: dict, stage: str, render: Renderer | 
         gains = f" (it passes {passes} spec checklist items, the accepted attempt {before}; newly met: {'; '.join(i.text for i in gained)})"
 
     # Rule 3: blind comparison in a seeded random order; only a win for the accepted attempt rolls back.
+    _check_budget(run, f"{stage}/compare", "comparison")  # before rendering both attempts
     previous = AttemptView(render(accepted.checkpoint.state, None) if render else [], terrain_stats(accepted.checkpoint.state))
     current = AttemptView(render(revision.checkpoint.state, None) if render else [], terrain_stats(revision.checkpoint.state))
     revision_first = comparison_order(run.session.stack.base.seed, revision.round)
@@ -310,6 +318,7 @@ def _compare(run: _Run, critic: Critic, spec: dict, stage: str, references: list
     first, second = (current, previous) if revision_first else (previous, current)
     order = {"1": "revision", "2": "previous"} if revision_first else {"1": "previous", "2": "revision"}
     for attempt in (1, 2):
+        _check_budget(run, f"{stage}/compare", "comparison" if attempt == 1 else "comparison retry")
         try:
             out, response = critic.compare(spec, first, second, references)
         except CriticError as e:
@@ -323,6 +332,17 @@ def _compare(run: _Run, critic: Critic, spec: dict, stage: str, references: list
                note=f"blind comparison: {winner}")
         return winner, out.why
     return "same", "the comparison failed twice"
+
+
+class _OutOfBudget(Exception):
+    """The budget ran out before a critic or comparison call; `run_task` ends the run (message = reason)."""
+
+
+def _check_budget(run: _Run, stage: str, call: str) -> None:
+    """Every model call is budgeted, not only the builder's (DESIGN §9.2)."""
+    if (reason := run.tracker.exceeded()) is not None:
+        _trace(run, stage, note=f"{call} skipped: budget: {reason}")
+        raise _OutOfBudget(reason)
 
 
 def _charge(run: _Run, response: ModelResponse) -> None:

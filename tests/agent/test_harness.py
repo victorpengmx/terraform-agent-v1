@@ -75,6 +75,27 @@ def test_step_budget_stops_a_looping_model(session, tmp_path):
     assert result.stop.startswith("budget: step budget") and len(session.ops) == 3
 
 
+def test_a_budget_spent_by_the_build_skips_the_critic_and_ends_cleanly(session, tmp_path):
+    builder = ScriptedModel(response(tool_use("raise_peak", PEAK), stop="tool_use"), response(text("built")))
+    critic_model = ScriptedModel()  # no responses: any critic call would fail the test
+    result = run(session, builder, tmp_path, critic=Critic(critic_model), budget=Budget(max_steps=2), max_rounds=3)
+    assert result.stop == "budget: step budget reached (2/2 model calls)" and critic_model.calls == []
+    assert result.critiques == [] and result.accepted_round is None and [e.id for e in session.ops] == ["raise_peak_1"]
+    notes = [json.loads(l)["note"] or "" for l in (tmp_path / "t.jsonl").read_text().splitlines()]
+    assert "critique skipped: budget: step budget reached (2/2 model calls)" in notes
+    assert notes[-1] == "run ended: budget: step budget reached (2/2 model calls)"
+
+
+def test_a_budget_spent_by_the_critique_skips_the_comparison_and_keeps_the_accepted_attempt(session, tmp_path):
+    # Steps: build 2 + critique 1 + build 2 + critique 1 = 6, so the comparison must not run.
+    critic_model = ScriptedModel(critique_json(3), critique_json(4))
+    result = run(session, two_rounds(("raise_peak", HILL_2)), tmp_path, critic=Critic(critic_model),
+                 budget=Budget(max_steps=6), max_rounds=3)
+    assert result.stop.startswith("budget: step budget") and len(critic_model.calls) == 2 and len(result.critiques) == 2
+    assert result.accepted_round == 1 and [e.id for e in session.ops] == ["raise_peak_1"]  # the unjudged revision is undone
+    assert "comparison skipped: budget" in (tmp_path / "t.jsonl").read_text()
+
+
 def test_episode_rotates_when_context_is_long(session, tmp_path):
     model = ScriptedModel(
         response(tool_use("raise_peak", PEAK), stop="tool_use", input_tokens=200_000),
