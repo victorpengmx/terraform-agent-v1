@@ -19,14 +19,14 @@ from __future__ import annotations
 
 import random
 from dataclasses import dataclass, field
-from typing import Any, Callable, Literal
+from typing import Any, Callable, Literal, TypeVar
 
 from agent.budget import Budget, BudgetTracker
 from agent.context import ContextManager, Episode, RollbackFeedback
-from agent.critic import AttemptView, Critic, CriticError, CritiqueResult, spec_checklist
-from agent.models import ModelAdapter, ModelResponse
+from agent.critic import AttemptView, Critic, CritiqueResult, spec_checklist
+from agent.models import ModelAdapter, ModelReplyError, ModelResponse
 from agent.session import Session, Snapshot, op_diff, terrain_stats
-from agent.spec import FeatureGraph, SpecError, write_spec
+from agent.spec import FeatureGraph, write_spec
 from agent.tools import Tool, execute, tool_result
 from agent.tracing import Tracer, TraceRecord
 from terrain.state import WorldState
@@ -35,6 +35,7 @@ from terrain.state import WorldState
 # used for the blind comparison so no image says how many ops built it.
 Renderer = Callable[[WorldState, str | None], list[bytes]]
 Winner = Literal["revision", "previous", "same"]
+_T = TypeVar("_T")
 
 
 @dataclass
@@ -223,39 +224,31 @@ def run_stage(run: _Run, episode: Episode, stage: str, render: Renderer | None =
 def _spec(run: _Run, prompt: str, images: list[bytes]) -> FeatureGraph | None:
     """SPEC step (DESIGN §9.3): one call with the builder model, retried once; a second failure runs without
     a graph rather than crashing."""
-    for attempt in (1, 2):
-        try:
-            graph, response = write_spec(run.model, prompt, images)
-        except SpecError as e:
-            if e.response is not None:
-                _charge(run, e.response)
-            _trace(run, "spec", e.response, note=f"SPEC failed (try {attempt} of 2): {e}")
-            continue
-        _charge(run, response)
-        _trace(run, "spec", response, scores={"graph": graph.model_dump(mode="json")},
-               note=f"feature graph: {len(graph.features)} features, {len(graph.relations)} relations")
-        return graph
-    _trace(run, "spec", note="SPEC failed twice; building from the raw prompt without a checklist")
-    return None
+    out, _ = _retry_once(run, "spec", "SPEC", lambda: write_spec(run.model, prompt, images))
+    if out is None:
+        _trace(run, "spec", note="SPEC failed twice; building from the raw prompt without a checklist")
+        return None
+    graph, response = out
+    _charge(run, response)
+    _trace(run, "spec", response, scores={"graph": graph.model_dump(mode="json")},
+           note=f"feature graph: {len(graph.features)} features, {len(graph.relations)} relations")
+    return graph
 
 
 def _critique(run: _Run, critic: Critic, spec: dict, stage: str, render: Renderer | None, references: list[bytes]) -> CritiqueResult:
     """Critique the current terrain. An unusable critic reply is retried once; a second failure records a
     failed round (programmatic checks only) instead of crashing the run."""
-    _check_budget(run, f"{stage}/critique", "critique")
-    renders = render(run.session.state, f"{len(run.session.ops)} ops") if render else []
-    error = ""
-    for attempt in (1, 2):
-        if attempt == 2:
-            _check_budget(run, f"{stage}/critique", "critique retry")
-        try:
-            critique, response = critic.critique(spec, run.session, renders=renders, references=references)
-        except CriticError as e:
-            if e.response is not None:
-                _charge(run, e.response)
-            error = str(e)
-            _trace(run, f"{stage}/critique", e.response, note=f"critic failed (try {attempt} of 2): {e}")
-            continue
+    renders: list[bytes] | None = None
+
+    def call() -> tuple[CritiqueResult, ModelResponse | None]:
+        nonlocal renders
+        if renders is None:  # rendered once, after the first budget check
+            renders = render(run.session.state, f"{len(run.session.ops)} ops") if render else []
+        return critic.critique(spec, run.session, renders=renders, references=references)
+
+    out, error = _retry_once(run, f"{stage}/critique", "critic", call, budget="critique")
+    if out is not None:
+        critique, response = out
         if response is not None:
             _charge(run, response)
         _trace(run, f"{stage}/critique", response, scores=critique.model_dump() | {"fixes": critique.fix_stats()},
@@ -318,21 +311,36 @@ def _compare(run: _Run, critic: Critic, spec: dict, stage: str, references: list
     """One blind comparison, retried once on an unusable reply; two failures count as no winner."""
     first, second = (current, previous) if revision_first else (previous, current)
     order = {"1": "revision", "2": "previous"} if revision_first else {"1": "previous", "2": "revision"}
+    result, _ = _retry_once(run, f"{stage}/compare", "comparison", lambda: critic.compare(spec, first, second, references),
+                            budget="comparison")
+    if result is None:
+        return "same", "the comparison failed twice"
+    out, response = result
+    _charge(run, response)
+    winner: Winner = "same" if out.better == "same" else order[out.better]  # type: ignore[assignment]
+    _trace(run, f"{stage}/compare", response, scores={"round": round_no, "order": order, "winner": winner, **out.model_dump()},
+           note=f"blind comparison: {winner}")
+    return winner, out.why
+
+
+def _retry_once(run: _Run, stage: str, label: str, call: Callable[[], _T], budget: str | None = None) -> tuple[_T | None, str]:
+    """Run a structured model call, retrying once on an unusable reply: (result, "") or (None, last error).
+
+    A failed reply is still charged and traced ("<label> failed (try n of 2)"). With `budget` (the call's
+    name in the trace), the budget is checked before each try ("<budget> skipped" / "<budget> retry
+    skipped"); SPEC passes none, as it runs before anything is spent."""
+    error = ""
     for attempt in (1, 2):
-        _check_budget(run, f"{stage}/compare", "comparison" if attempt == 1 else "comparison retry")
+        if budget is not None:
+            _check_budget(run, stage, budget if attempt == 1 else f"{budget} retry")
         try:
-            out, response = critic.compare(spec, first, second, references)
-        except CriticError as e:
+            return call(), ""
+        except ModelReplyError as e:
             if e.response is not None:
                 _charge(run, e.response)
-            _trace(run, f"{stage}/compare", e.response, note=f"comparison failed (try {attempt} of 2): {e}")
-            continue
-        _charge(run, response)
-        winner: Winner = "same" if out.better == "same" else order[out.better]  # type: ignore[assignment]
-        _trace(run, f"{stage}/compare", response, scores={"round": round_no, "order": order, "winner": winner, **out.model_dump()},
-               note=f"blind comparison: {winner}")
-        return winner, out.why
-    return "same", "the comparison failed twice"
+            error = str(e)
+            _trace(run, stage, e.response, note=f"{label} failed (try {attempt} of 2): {e}")
+    return None, error
 
 
 class _OutOfBudget(Exception):
