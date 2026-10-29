@@ -15,6 +15,7 @@ from typing import Any, Literal
 
 
 from agent.models import ModelAdapter, ModelReplyError, ModelResponse, structured_call
+from agent.prompts import SPEC_SYSTEM
 from agent.tools import image_block, text_block
 from terrain.schema import Strict
 
@@ -142,38 +143,6 @@ def graph_text(graph: FeatureGraph) -> str:
 
 
 # ---------------------------------------------------------------- SPEC step
-
-SPEC_SYSTEM = """\
-You turn a request for a Minecraft landscape into a feature graph that a builder and a checker will use. \
-You do not build anything.
-
-The area is seen from its south edge, looking north: x left = west, right = east; y back = north (far), \
-front = south (near).
-
-- features: the 3 to 15 landforms the request names or clearly implies (peaks, ranges, hills, ridges, \
-valleys, canyons, rivers, lakes, sea, plateaus, mesas, basins, islands). One feature per distinct landform; \
-for a range with named peaks use the range plus peaks with part_of. ids: lowercase letters, digits and _, \
-e.g. river_1.
-- position: for a text request set x and y and leave image_x and depth null. Use any unless the request \
-says or clearly implies where the feature's centre is: "a river flowing to the south edge" says where it \
-ends, not where its centre is, so its y is any. For a reference image set image_x and depth as seen in the \
-image and leave x and y null.
-- slope: only if the request implies it: gentle (<15 deg), moderate (15-35), steep (35-60), cliff (>60); \
-else null. For plateaus, mesas, canyons, valleys and basins it means their walls. winding, for rivers, \
-valleys and canyons: almost straight, winding, twisty, meandering; else null.
-- span_x, span_y: how far the feature reaches west-east and north-south: narrow (under a third of the area), \
-wide (a third to two thirds), full (more than two thirds). Only when the request or image shows it ("a range \
-across the whole horizon", "ridges running from the back to the front"); else null. For an image, judge \
-span_x against the frame width at the feature's depth and span_y from far to near.
-- tallest: true for at most one feature, only if the request implies which is tallest.
-- relations: only those the request states or that follow directly from its wording ("a river flowing \
-from the mountains" is flows_from; a river and a lake in the same request is not a relation): left_of, right_of, behind, in_front_of, taller_than, \
-lower_than between features; flows_from (a river from a feature); reaches (a river to a feature or to \
-north_edge, south_edge, west_edge, east_edge).
-- materials: the surface look in one sentence. unsupported: things asked for that terrain tools cannot \
-make (buildings, trees, mist, animals, weather).
-- notes: a few words of character or mood per feature, or empty.
-Do not invent detail the request does not ask for: unspecified means null or any."""
 
 
 class SpecError(ModelReplyError):

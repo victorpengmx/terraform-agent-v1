@@ -16,6 +16,7 @@ from pydantic import BaseModel, Field
 from agent.catalogue import hint_problems, tool_catalogue
 from agent.checks import CheckResult, run_checks
 from agent.models import ModelAdapter, ModelReplyError, ModelResponse, structured_call
+from agent.prompts import COMPARE_SYSTEM, CRITIC_SYSTEM
 from agent.session import Session
 from agent.checklist import Item, checklist, summary as checklist_summary
 from agent.spec import spec_text
@@ -157,46 +158,6 @@ class AttemptView:
 
     renders: list[bytes]
     stats: str
-
-
-COMPARE_SYSTEM = """\
-You compare two Minecraft landscapes, Terrain 1 and Terrain 2, built for the same spec. You built neither. \
-Judge which better fulfils the spec: the features it asks for and their layout, natural-looking landforms, \
-and clean block-scale quality (no spikes, no floating water). First list the strengths of each terrain, \
-then decide. Answer "same" when neither is clearly better; small differences are "same"."""
-
-
-CRITIC_SYSTEM = """\
-You are a strict critic of Minecraft landscapes produced by a terrain-generation agent. You judge the \
-result against the user's spec. You did not build it.
-
-Rubric (1-5 each):
-- prompt_adherence: does it contain what the spec asks for, at the asked scale? 1 = unrelated, 3 = main \
-features present with gaps, 5 = everything asked for.
-- layout: placement and proportions of features across the area. 1 = arbitrary, 3 = workable, 5 = \
-deliberate and balanced.
-- naturalism: would this read as a natural landform? 1 = obviously synthetic (perfect cones, uniform \
-spacing), 3 = plausible, 5 = convincing.
-- minecraft_quality: block-scale quality: no spikes, no floating water, walkable transitions where \
-expected. 1 = broken, 3 = minor artifacts, 5 = clean.
-- materials: the surface blocks, judged in the 3D render: do they suit each landform and each part of the \
-scene (wherever it is: either side, background or foreground, summits or lower slopes), and do they vary \
-naturally? With a reference, compare every landform's surface with what the reference shows at that place, \
-not only those the spec gives a material for: slopes the reference shows green stay vegetated even when \
-steep, and rock belongs where it shows bare rock. Without one, rock suits steep or high ground, soil and \
-grass gentle ground, sand or gravel the water's edge. 1 = wrong or one block everywhere, 3 = plausible with \
-artifacts (rings or stripes of one block, bare stone walls, abrupt switches at one slope), 5 = convincing. \
-Fix materials with set_palette_rules or paint_region; a palette WARNING in the op list (a rule mostly \
-overridden by an earlier rule) is fixed by reordering the rules.
-- reference_match: how well the terrain matches the reference images, null if there are none. The photo is a \
-perspective view; with reference images the 3D render is taken from the south edge looking north, the \
-viewpoint the spec assumes for the photo (left = west, near = south), so compare the main landforms, their \
-arrangement (left/right, near/far), proportions, mood and palette, not exact geometry.
-
-3 means acceptable. Reserve 5 for results you would show as a showcase. Locate every issue with an op id \
-or a normalized 'u,v' position ((0,0) = north-west corner) and give a concrete fix: the tool that makes it \
-and the parameter values to set, or tool "none" when no tool can make it. Say "pass" only if there are no \
-major or blocking issues and every score is at least 4."""
 
 
 def _fix_text(issue: Issue) -> str:

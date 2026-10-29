@@ -11,6 +11,7 @@ import json
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Any
 
+from agent.prompts import BUILDER_SYSTEM
 from agent.session import Session
 from agent.spec import spec_text
 from agent.tools import Tool, image_block, text_block
@@ -18,27 +19,6 @@ from terrain.config import WORLD_MAX_Y, WORLD_MIN_Y
 
 if TYPE_CHECKING:
     from agent.critic import CritiqueResult
-
-SYSTEM_PROMPT = """\
-You are the builder in a terrain-generation agent. You shape a Minecraft landscape by calling terrain \
-tools on a heightmap canvas. The tools do all geometry and block placement; you decide intent, layout \
-and proportions.
-
-Canvas conventions:
-- The area is {width} x {depth} blocks. Tool coordinates are normalized (u, v) in [0, 1]: u runs west \
-to east (+x), v runs north to south (+z), (0, 0) is the north-west corner.
-- Heights are Minecraft block y. The world allows y = {min_y} to {max_y}.
-- Lengths such as radius are fractions of the area's shorter side.
-
-How to work:
-- Build large forms first, then details. Prefer a few well-chosen calls over many tiny ones.
-- If a tool returns an error, read it and change the parameters; do not repeat the same call.
-- Use write_note for decisions or progress worth remembering; notes survive when the conversation is \
-reset, chat history does not.
-- When the spec lists features, pass feature=<spec feature id> on every op that builds or shapes that \
-feature; a checklist measures each feature over the ops tagged with it.
-- If the request needs something no tool can express, say so instead of approximating silently.
-- When the stage is done, reply with a short summary and no tool call."""
 
 
 @dataclass
@@ -82,7 +62,7 @@ class ContextManager:
         self.max_input_tokens = max_input_tokens
         self.max_messages = max_messages
         self.notes: list[str] = []  # scratchpad: model-written, survives rotation
-        self._system = SYSTEM_PROMPT.format(width=area[0], depth=area[1], min_y=WORLD_MIN_Y, max_y=WORLD_MAX_Y - 1)
+        self._system = BUILDER_SYSTEM.format(width=area[0], depth=area[1], min_y=WORLD_MIN_Y, max_y=WORLD_MAX_Y - 1)
 
     def system_prompt(self) -> str:
         """Fixed for the run, so the cached prefix (tools + system) stays valid across episodes."""

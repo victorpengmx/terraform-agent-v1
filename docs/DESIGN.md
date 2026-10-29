@@ -1088,7 +1088,8 @@ terraform-agent/
     critic.py               # critique, blind comparison, their output models
     checks.py               # programmatic checks (§11.2)
     catalogue.py            # critic tool catalogue, structured-fix validation (§11.5)
-    context.py              # episodes, system prompt, scratchpad
+    context.py              # episodes, scratchpad
+    prompts.py              # the fixed system prompts (builder, SPEC, critic, comparison)
     budget.py, tracing.py, run.py
   eval/                     # benchmark.yaml, run_eval.py, judge.py, reports/
   scripts/                  # hello_amulet, demos, compile_world, calibration_sweep, migrate_stacks, build_block_colors,
