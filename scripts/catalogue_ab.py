@@ -18,7 +18,8 @@ from pathlib import Path
 
 from dotenv import load_dotenv
 
-from agent.critic import Critic, CriticError, hint_problems
+from agent.catalogue import hint_problems
+from agent.critic import Critic, CriticError
 from agent.session import Session
 from agent.tracing import Tracer, TraceRecord
 from terrain.opstack import OpStack

@@ -680,7 +680,7 @@ al.](https://arxiv.org/abs/2310.01798)); tool-grounded critique works much bette
   above ~70°, share of 1-block steps on gentle ground); water containment; meaningful change vs. the flat
   base; thin features.
 
-  Implemented in M4 (`agent/critic.py` `run_checks`). Thresholds are set so the three demos and the
+  Implemented in M4 (`agent/checks.py` `run_checks`; in `agent/critic.py` until 2026-10-30). Thresholds are set so the three demos and the
   baseline run pass and constructed broken terrains fail (EVIDENCE 2026-10-22):
 
   | Check | Severity | Measure | Fails when |
@@ -797,7 +797,7 @@ orders) must pick the intact one. Tools: `scripts/gate_stats.py` (win rates from
 - [MVP, optional] **Tool catalogue** in the critic's system prompt (one line per op: name, first sentence,
   parameter names; generated from the registry; cached). Fix hints then name real tools; count "no tool"
   hints as a ranked list of missing tools.
-  Implemented in M4 (`agent/critic.py`):
+  Implemented in M4 (`agent/catalogue.py` and `agent/critic.py`):
   - **Catalogue** (`tool_catalogue`): every parameter is shown with its allowed values (`profile=v|u`) or
     range (`width [0..1]`), plus `update_op`/`remove_op`, the character presets and the region shapes.
   - **Structured fix:** each issue states its fix as `tool` (an op, `update_op`, `remove_op` or `"none"`) and
@@ -1069,7 +1069,9 @@ terraform-agent/
   docs/                     # DESIGN.md, ROADMAP.md, EVIDENCE.md, images/ (README shots)
   terrain/
     config.py               # WORLD_MIN_Y, WORLD_MAX_Y
-    state.py                # WorldState, features
+    state.py                # WorldState, features, to_xz / to_uv coordinates
+    geometry.py             # slope_deg
+    schema.py               # Strict pydantic base (schemas sent to a model)
     features.py             # measured feature attributes, categories (§4.2)
     opstack.py              # op stack, replay, checkpoints
     brushes.py              # distances, falloff, blend
@@ -1083,7 +1085,9 @@ terraform-agent/
     tools.py                # op tools + observe/control tools
     session.py              # agent-facing wrapper over the op stack
     harness.py              # outer + inner loop, acceptance gate
-    critic.py               # checks, critique, blind comparison
+    critic.py               # critique, blind comparison, their output models
+    checks.py               # programmatic checks (§11.2)
+    catalogue.py            # critic tool catalogue, structured-fix validation (§11.5)
     context.py              # episodes, system prompt, scratchpad
     budget.py, tracing.py, run.py
   eval/                     # benchmark.yaml, run_eval.py, judge.py, reports/

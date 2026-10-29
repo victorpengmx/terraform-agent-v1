@@ -4,7 +4,8 @@ import json
 
 import pytest
 
-from agent.critic import Change, Critic, Issue, hint_problems, tool_catalogue
+from agent.catalogue import hint_problems, tool_catalogue
+from agent.critic import Change, Critic, Issue
 from agent.session import Session
 from fakes import PEAK, ScriptedModel, critique_json, response, text, tool_use
 from terrain.ops import list_ops

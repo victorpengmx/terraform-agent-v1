@@ -4,7 +4,8 @@ with a location, on the artifact it targets."""
 import numpy as np
 import pytest
 
-from agent.critic import CheckResult, Critic, CritiqueResult, run_checks
+from agent.checks import CheckResult, run_checks
+from agent.critic import Critic, CritiqueResult
 from agent.session import Session
 from fakes import PEAK, ScriptedModel
 
