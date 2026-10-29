@@ -132,7 +132,7 @@ class CritiqueResult(BaseModel):
 
     @property
     def score(self) -> float:
-        """Mean rubric score; 0 when blocked. Used for score-gated acceptance."""
+        """Mean rubric score; 0 when blocked. For reports only: it never gates acceptance (DESIGN §11.4)."""
         if self.scores is None:
             return 0.0
         vals = [v for v in self.scores.model_dump().values() if v is not None]

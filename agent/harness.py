@@ -10,8 +10,9 @@ Grown from a port of Thorsten Ball's "How to Build an Agent". Two layers:
   comparison prefers the accepted attempt. Rolled-back rounds tell the builder why and what they had changed. Absolute rubric scores never
   gate (they are noisy and tie often), and the run always ends on the latest accepted attempt.
 
-The SPEC step (DESIGN §9.3) comes in M5, CLARIFY and multi-stage runs (§9.1) later; for now the spec is
-the prompt and there is one stage.
+Before the loop, a SPEC step (DESIGN §9.3) turns the prompt and reference images into a feature graph, pinned
+for the run with the prompt (skipped with `use_spec=False`, or replaced by a given `graph`). CLARIFY and
+multi-stage runs (§9.1) come later; for now there is one stage.
 """
 
 from __future__ import annotations
