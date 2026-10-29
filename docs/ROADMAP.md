@@ -96,7 +96,7 @@ Design text and images together; build text first, then images on the same forma
 - [x] SPEC step for text prompts; graph pinned in every episode and given to the critic
 - [x] Optional `feature` argument on op tools; spec feature → op ids mapping; per-feature measurement (§4.3)
 - [x] Code-checked checklist items with dependency skipping (§11.3); failed items fed back as located
-      issues; pass count wired into the acceptance gate (rule 2, symmetric)
+      issues; pass count wired into the acceptance gate (rule 2; one-sided since 2026-10-29)
 - [x] Reference images: SPEC from an image (+ optional text) with image-relative positions; code projection
       to (u, v) bands; critic sees the reference next to the L2 overview and fills `reference_match`
 - [x] Milestone: one text and one image prompt built end to end and checked in game

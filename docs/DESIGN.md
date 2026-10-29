@@ -743,8 +743,9 @@ in-call comparison labelled "previous"/"revision": models favour the item framed
 keep the revision almost always. Design:
 
 1. **Roll back** if the revision fails a blocking or major programmatic check the previous attempt passed.
-2. **Roll back** if the spec checklist pass count drops (§11.3). Since M5 also the reverse: a revision
-   that passes more checklist items is kept without a comparison. Equal counts go on to rule 3.
+2. **Roll back** if the spec checklist pass count drops (§11.3). Equal or higher counts go on to rule 3; a
+   gain is named in `why` but does not skip the comparison (a checklist gain can come with a worse-looking
+   build).
 3. Otherwise a **blind comparison**, a call separate from the critique:
    - the two attempts shown as "Terrain 1" and "Terrain 2" in a seeded random order (seed = run seed +
      round); nothing says which is newer; record the order in the trace
@@ -762,9 +763,13 @@ keep the revision almost always. Design:
 Implementation details (M4, `agent/harness.py`):
 - **Baseline.** Round 1's attempt is accepted as the baseline, failed checks or not: there is nothing to
   compare it with. A "pass" verdict ends the run only on an accepted attempt.
-- **Rule 2** (M5) is symmetric, decided 2026-10-23: fewer passes roll back and more passes keep the
-  revision. In the first runs a revision that fixed a spec item (5/7 → 6/7) was rolled back by the
-  comparison; objective evidence now takes precedence over the model's preference.
+- **Rule 2** (M5) was symmetric from 2026-10-23 to 2026-10-29: more passes kept the revision without a
+  comparison, after a revision that fixed a spec item (5/7 → 6/7) had been rolled back by the comparison.
+  Since 2026-10-29 it is one-sided again: fewer passes roll back at once, and a gain still goes to the blind
+  comparison, which rolls back only if it prefers the accepted attempt (in both orders with
+  `--compare-both-orders`). The checklist counts what and where, not looks (EVIDENCE 2026-10-23, M5 image
+  build: 16/16 every round on a build only loosely like the photo), so a gain alone shouldn't keep a
+  worse-looking build. The rollback feedback names the gain, so the builder knows what to keep.
 - **Order.** `random.Random(run_seed * 1000 + round)` decides whether the revision is Terrain 1
   (`comparison_order`). Until 2026-10-29 `agent.run` never set a seed, so every run used seed 0 and the
   same order sequence; now the seed comes from `--seed` or the run id (§9.5).

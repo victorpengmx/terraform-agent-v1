@@ -113,7 +113,7 @@ class CritiqueResult(BaseModel):
         return [i for i in self.checklist if i.status != "pass" and i.id in passed_before]
 
     def checklist_gains(self, previous: CritiqueResult) -> list[Item]:
-        """Checklist items that pass here but not in `previous` (shown when gate rule 2 keeps a revision)."""
+        """Checklist items that pass here but not in `previous` (named in the gate's why on a checklist gain)."""
         passed_before = {i.id for i in previous.checklist if i.status == "pass"}
         return [i for i in self.checklist if i.status == "pass" and i.id not in passed_before]
 

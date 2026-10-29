@@ -6,8 +6,8 @@ Grown from a port of Thorsten Ball's "How to Build an Agent". Two layers:
   model ends its turn, the budget runs out or the model refuses. Branches on stop_reason explicitly.
 - `run_task`: the outer loop. BUILD -> CRITIQUE -> (REVISE | ACCEPT), up to `max_rounds`, with the
   acceptance gate of DESIGN §11.4: the first attempt is the baseline; a revision is rolled back if it
-  fails a blocking/major check the accepted attempt passed, or if a blind comparison prefers the accepted
-  attempt. Rolled-back rounds tell the builder why and what they had changed. Absolute rubric scores never
+  fails a blocking/major check the accepted attempt passed, passes fewer spec checklist items, or a blind
+  comparison prefers the accepted attempt. Rolled-back rounds tell the builder why and what they had changed. Absolute rubric scores never
   gate (they are noisy and tie often), and the run always ends on the latest accepted attempt.
 
 The SPEC step (DESIGN §9.3) comes in M5, CLARIFY and multi-stage runs (§9.1) later; for now the spec is
@@ -260,20 +260,26 @@ def _critique(run: _Run, critic: Critic, spec: dict, stage: str, render: Rendere
 
 def _gate(run: _Run, critic: Critic, spec: dict, stage: str, render: Renderer | None, references: list[bytes],
           accepted: Attempt, revision: Attempt, both_orders: bool) -> tuple[bool, str]:
-    """Acceptance gate (DESIGN §11.4): (keep the revision?, why)."""
+    """Acceptance gate (DESIGN §11.4): (keep the revision?, why).
+
+    1. A blocking/major check the accepted attempt passed now fails: roll back.
+    2. Fewer spec checklist passes: roll back. More passes still go to the comparison (a checklist gain can
+       come with a worse-looking build); the gained items are named in `why` either way.
+    3. Blind comparison: roll back only if it prefers the accepted attempt (in both orders with
+       `both_orders`); a tie or a failed comparison keeps the revision.
+    """
     regressed = revision.critique.regressions(accepted.critique)
     if regressed:  # rule 1
         return False, "it fails checks the accepted attempt passed: " + "; ".join(f"{c.name} ({c.detail})" for c in regressed)
-    # Rule 2, symmetric (decided 2026-10-23): the spec checklist is objective evidence, so fewer passes roll
-    # back and more passes keep the revision without asking the comparison; equal passes go on to rule 3.
     passes, before = revision.critique.checklist_passes, accepted.critique.checklist_passes
-    if accepted.critique.checklist and passes < before:
+    if accepted.critique.checklist and passes < before:  # rule 2
         lost = revision.critique.checklist_losses(accepted.critique)
         return False, (f"it passes {passes} spec checklist items, the accepted attempt {before}; no longer met: "
                        + "; ".join(f"{i.text} ({i.detail})" for i in lost))
+    gains = ""
     if accepted.critique.checklist and passes > before:
         gained = revision.critique.checklist_gains(accepted.critique)
-        return True, f"it passes {passes} spec checklist items, the accepted attempt {before}; newly met: " + "; ".join(i.text for i in gained)
+        gains = f" (it passes {passes} spec checklist items, the accepted attempt {before}; newly met: {'; '.join(i.text for i in gained)})"
 
     # Rule 3: blind comparison in a seeded random order; only a win for the accepted attempt rolls back.
     previous = AttemptView(render(accepted.checkpoint.state, None) if render else [], terrain_stats(accepted.checkpoint.state))
@@ -284,10 +290,10 @@ def _gate(run: _Run, critic: Critic, spec: dict, stage: str, render: Renderer | 
     winners = {w for w, _ in verdicts}
     why = verdicts[0][1]
     if winners == {"previous"}:
-        return False, f"a blind comparison preferred the accepted attempt: {why}"
+        return False, f"a blind comparison preferred the accepted attempt{' despite the checklist gain' if gains else ''}: {why}{gains}"
     if winners == {"revision"}:
-        return True, f"a blind comparison preferred it: {why}"
-    return True, f"no clear winner in the blind comparison, so the revision is kept: {why}"
+        return True, f"a blind comparison preferred it: {why}{gains}"
+    return True, f"no clear winner in the blind comparison, so the revision is kept: {why}{gains}"
 
 
 def comparison_order(seed: int, round_no: int) -> bool:

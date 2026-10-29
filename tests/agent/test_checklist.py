@@ -7,7 +7,7 @@ import pytest
 from agent.budget import Budget
 from agent.checklist import checklist, summary
 from agent.critic import Critic
-from agent.harness import run_task
+from agent.harness import comparison_order, run_task
 from agent.session import Session
 from agent.spec import FeatureGraph
 from agent.tools import control_tools, op_tools
@@ -135,20 +135,25 @@ def test_a_valley_or_canyon_can_be_checked_for_winding(s):
     assert "add bends" in more.detail
 
 
-def test_gate_rule_2_keeps_a_higher_checklist_pass_count_without_a_comparison(s, tmp_path):
+@pytest.mark.parametrize("winner, kept", [("previous", False), ("revision", True), ("same", True)])
+def test_gate_rule_2_still_asks_the_comparison_when_the_checklist_gains(s, tmp_path, winner, kept):
     g = FeatureGraph.model_validate(graph(feature("peak_1")))
     builder = ScriptedModel(
         response(tool_use("raise_peak", PEAK | {"id": "m"}), stop="tool_use"), response(text("r1")),
         response(tool_use("update_op", {"id": "m", "params": {"feature": "peak_1"}}, id="tu_2"), stop="tool_use"), response(text("r2")),
     )
-    critic_model = ScriptedModel(critique_json(4), critique_json(3))  # no comparison scripted: it must not be asked
+    revision_first = comparison_order(s.stack.base.seed, 2)
+    answer = "same" if winner == "same" else "1" if (winner == "revision") == revision_first else "2"
+    critic_model = ScriptedModel(critique_json(4), critique_json(3), compare_json(answer, "the old one looks better"))
     tools = {t.name: t for t in [*op_tools(s), *control_tools(s)]}
     result = run_task(prompt="a peak", images=[], session=s, tools=tools, model=builder, graph=g, critic=Critic(critic_model),
                       tracer=Tracer(run_id="t", root=tmp_path), budget=Budget(), max_rounds=2)
-    assert result.accepted_round == 2 and len(critic_model.calls) == 2
+    assert len(critic_model.calls) == 3  # critique, critique, comparison despite the gain
+    assert result.accepted_round == (2 if kept else 1) and (s.ops[0].feature == "peak_1") is kept
     notes = [json.loads(l).get("note") or "" for l in (tmp_path / "t.jsonl").read_text().splitlines()]
-    assert any("accepted round 2: it passes 1 spec checklist items, the accepted attempt 0; newly met: peak_1 (peak) exists" in n
-               for n in notes)
+    gain = "(it passes 1 spec checklist items, the accepted attempt 0; newly met: peak_1 (peak) exists)"
+    prefix = "accepted round 2: " if kept else "rolled back round 2: a blind comparison preferred the accepted attempt despite the checklist gain"
+    assert any(n.startswith(prefix) and gain in n for n in notes), notes
 
 
 def test_extent_passes_for_a_full_width_ridge_and_fails_for_a_single_cone():
