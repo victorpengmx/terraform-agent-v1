@@ -13,9 +13,9 @@ import json
 import re
 from typing import Any, Literal
 
-from pydantic import BaseModel, ConfigDict, ValidationError
+from pydantic import BaseModel, ConfigDict
 
-from agent.models import ModelAdapter, ModelResponse
+from agent.models import ModelAdapter, ModelReplyError, ModelResponse, structured_call
 from agent.tools import image_block, text_block
 
 FeatureType = Literal["peak", "mountain_range", "hills", "ridge", "valley", "canyon", "river", "lake", "sea", "plateau",
@@ -180,12 +180,8 @@ make (buildings, trees, mist, animals, weather).
 Do not invent detail the request does not ask for: unspecified means null or any."""
 
 
-class SpecError(Exception):
+class SpecError(ModelReplyError):
     """The SPEC reply was unusable (refusal, truncation, invalid JSON or an invalid graph)."""
-
-    def __init__(self, message: str, response: ModelResponse | None = None) -> None:
-        super().__init__(message)
-        self.response = response
 
 
 def write_spec(model: ModelAdapter, prompt: str, images: list[bytes] | None = None) -> tuple[FeatureGraph, ModelResponse]:
@@ -195,14 +191,7 @@ def write_spec(model: ModelAdapter, prompt: str, images: list[bytes] | None = No
     if images:
         request += "\n\nReference image(s) are attached above: describe the landforms in them, with image positions."
     content.append(text_block(request))
-    response = model.complete([{"role": "user", "content": content}], system=SPEC_SYSTEM,
-                              response_schema=FeatureGraph.model_json_schema())
-    if response.stop_reason != "end_turn":
-        raise SpecError(f"stopped with {response.stop_reason!r} (details: {response.stop_details})", response)
-    try:
-        graph = FeatureGraph.model_validate_json(response.text)
-    except ValidationError as e:
-        raise SpecError(f"returned invalid JSON: {e}", response) from None
+    graph, response = structured_call(model, content, SPEC_SYSTEM, FeatureGraph, SpecError)
     if problems := graph.problems():
         raise SpecError("invalid graph: " + "; ".join(problems), response)
     return graph, response

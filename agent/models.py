@@ -9,9 +9,10 @@ from __future__ import annotations
 
 import time
 from dataclasses import dataclass, field
-from typing import Any, Literal, Protocol
+from typing import Any, Literal, Protocol, TypeVar
 
 import anthropic
+from pydantic import BaseModel, ValidationError
 
 Effort = Literal["low", "medium", "high", "xhigh", "max"]
 
@@ -88,6 +89,31 @@ class ModelAdapter(Protocol):
         """One model call. `response_schema` constrains the reply to JSON matching that schema
         (no numeric/string-length constraints; every object needs additionalProperties: false)."""
         ...
+
+
+class ModelReplyError(Exception):
+    """A structured reply was unusable (refusal, truncation, invalid JSON)."""
+
+    def __init__(self, message: str, response: ModelResponse | None = None) -> None:
+        super().__init__(message)
+        self.response = response  # the unusable reply, so its tokens are still charged and traced
+
+
+_T = TypeVar("_T", bound=BaseModel)
+
+
+def structured_call(model: ModelAdapter, content: list[dict[str, Any]], system: str, schema: type[_T],
+                    error: type[ModelReplyError] = ModelReplyError) -> tuple[_T, ModelResponse]:
+    """One strict-JSON call in a fresh context (one user message). Raises `error` (a ModelReplyError
+    subclass, so callers keep their own except clauses), carrying the response so its cost is still charged."""
+    response = model.complete([{"role": "user", "content": content}], system=system,
+                              response_schema=schema.model_json_schema())
+    if response.stop_reason != "end_turn":
+        raise error(f"stopped with {response.stop_reason!r} (details: {response.stop_details})", response)
+    try:
+        return schema.model_validate_json(response.text), response
+    except ValidationError as e:
+        raise error(f"returned invalid JSON: {e}", response) from None
 
 
 @dataclass

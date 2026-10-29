@@ -9,13 +9,13 @@ from __future__ import annotations
 
 import json
 from dataclasses import dataclass
-from typing import Annotated, Literal, TypeVar
+from typing import Annotated, Literal
 
 import numpy as np
 from pydantic import BaseModel, ConfigDict, Field, ValidationError
 from scipy.ndimage import grey_opening
 
-from agent.models import ModelAdapter, ModelResponse
+from agent.models import ModelAdapter, ModelReplyError, ModelResponse, structured_call
 from agent.session import Session
 from agent.checklist import Item, checklist, summary as checklist_summary
 from agent.spec import spec_text
@@ -37,12 +37,8 @@ MAX_WATER_LOST = 0.25  # demos lose 0.7-8.6% (shallow lake fringes, a known hard
 THIN_BLOCKS, MAX_THIN_SHARE = 4.0, 0.002  # demos 0.02-0.05% of columns; a 1.5-block wall 0.47%, the wreck 34%
 
 
-class CriticError(Exception):
+class CriticError(ModelReplyError):
     """The critic model's reply was unusable (refusal, truncation, invalid JSON)."""
-
-    def __init__(self, message: str, response: ModelResponse | None = None) -> None:
-        super().__init__(message)
-        self.response = response  # the unusable reply, so its tokens are still charged and traced
 
 
 class CheckResult(BaseModel):
@@ -56,9 +52,6 @@ class CheckResult(BaseModel):
 
 class _Strict(BaseModel):
     model_config = ConfigDict(extra="forbid")  # additionalProperties: false, required by structured outputs
-
-
-_T = TypeVar("_T", bound=_Strict)
 
 
 class Change(_Strict):
@@ -435,7 +428,7 @@ class Critic:
         content.append(text_block("\n\n".join(text)))
         content.extend(image_block(r) for r in renders or [])
 
-        out, response = self._structured(content, self.system, CritiqueOutput)
+        out, response = structured_call(self.model, content, self.system, CritiqueOutput, CriticError)
         failed_major = any(not c.passed and c.severity == "major" for c in checks)
         failed_major |= any(i.status == "fail" and i.severity == "major" for i in items)
         verdict = "revise" if failed_major else out.verdict
@@ -459,15 +452,4 @@ class Critic:
             content.append(text_block(f"# Terrain {label}\n{view.stats}" + ("\nRenders follow." if view.renders else "")))
             content.extend(image_block(r) for r in view.renders)
         content.append(text_block("Which terrain better fulfils the spec? Answer \"same\" if neither is clearly better."))
-        return self._structured(content, COMPARE_SYSTEM, CompareOutput)
-
-    def _structured(self, content: list[dict], system: str, schema: type[_T]) -> tuple[_T, ModelResponse]:
-        """One strict-JSON call. Raises CriticError (carrying the response, so its cost is still charged)."""
-        response = self.model.complete([{"role": "user", "content": content}], system=system,
-                                       response_schema=schema.model_json_schema())
-        if response.stop_reason != "end_turn":
-            raise CriticError(f"stopped with {response.stop_reason!r} (details: {response.stop_details})", response)
-        try:
-            return schema.model_validate_json(response.text), response
-        except ValidationError as e:
-            raise CriticError(f"returned invalid JSON: {e}", response) from None
+        return structured_call(self.model, content, COMPARE_SYSTEM, CompareOutput, CriticError)
