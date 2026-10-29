@@ -274,7 +274,7 @@ def _gate(run: _Run, critic: Critic, spec: dict, stage: str, render: Renderer | 
     # Rule 3: blind comparison in a seeded random order; only a win for the accepted attempt rolls back.
     previous = AttemptView(render(accepted.checkpoint.state, None) if render else [], terrain_stats(accepted.checkpoint.state))
     current = AttemptView(render(revision.checkpoint.state, None) if render else [], terrain_stats(revision.checkpoint.state))
-    revision_first = random.Random(run.session.stack.base.seed * 1000 + revision.round).random() < 0.5
+    revision_first = comparison_order(run.session.stack.base.seed, revision.round)
     orders = [revision_first, not revision_first] if both_orders else [revision_first]
     verdicts = [_compare(run, critic, spec, stage, references, previous, current, rev_first, revision.round) for rev_first in orders]
     winners = {w for w, _ in verdicts}
@@ -284,6 +284,12 @@ def _gate(run: _Run, critic: Critic, spec: dict, stage: str, render: Renderer | 
     if winners == {"revision"}:
         return True, f"a blind comparison preferred it: {why}"
     return True, f"no clear winner in the blind comparison, so the revision is kept: {why}"
+
+
+def comparison_order(seed: int, round_no: int) -> bool:
+    """Is the revision Terrain 1 in this round's blind comparison? Seeded by run seed and round, so a run
+    reproduces its orders and different runs (seeds) get different ones."""
+    return random.Random(seed * 1000 + round_no).random() < 0.5
 
 
 def _compare(run: _Run, critic: Critic, spec: dict, stage: str, references: list[bytes], previous: AttemptView,

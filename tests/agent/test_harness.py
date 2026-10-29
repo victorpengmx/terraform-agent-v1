@@ -1,12 +1,11 @@
 import json
-import random
 
 import numpy as np
 import pytest
 
 from agent.budget import Budget
 from agent.critic import Critic
-from agent.harness import run_task
+from agent.harness import comparison_order, run_task
 from agent.session import Session
 from agent.tools import observe_tools, op_tools
 from agent.tracing import Tracer
@@ -101,8 +100,7 @@ def two_rounds(*round2_ops, rounds=2):
     return ScriptedModel(*calls)
 
 
-def revision_first(seed: int, round_no: int) -> bool:
-    return random.Random(seed * 1000 + round_no).random() < 0.5  # same rule as the harness
+revision_first = comparison_order
 
 
 def previous_wins(seed: int, round_no: int) -> str:
@@ -145,6 +143,18 @@ def test_blind_comparison_rolls_back_when_the_previous_attempt_wins(tmp_path, se
 
 def test_both_comparison_orders_occur_across_seeds():
     assert {revision_first(seed, 2) for seed in range(6)} == {True, False}
+
+
+@pytest.mark.parametrize("seed", [0, 7, 123_456_789, 2**31 - 1])
+def test_comparison_order_varies_across_rounds_and_reproduces_per_seed(seed):
+    orders = [comparison_order(seed, r) for r in range(2, 12)]
+    assert set(orders) == {True, False}  # both orders across one run's rounds
+    assert orders == [comparison_order(seed, r) for r in range(2, 12)]  # the same seed reproduces them
+
+
+def test_different_seeds_give_different_order_sequences():
+    sequences = {tuple(comparison_order(seed, r) for r in range(2, 6)) for seed in range(20)}
+    assert len(sequences) > 1
 
 
 def test_a_tie_keeps_the_revision(session, tmp_path):

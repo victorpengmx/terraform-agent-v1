@@ -597,8 +597,9 @@ Model choices are decided by the benchmark and human calibration, not public lea
 One JSONL record per step: run id, stage, step, model, request id, stop reason, tokens (incl. cache),
 cost, latency, assistant text, tool calls (name, input, result, error flag), critic output, and a note
 (rollbacks, rotations, run end). Step 0 holds a header: prompt, reference image paths + hashes, models,
-effort, rounds, render level, budget, canvas, git commit + dirty flag, a hash of the tool list. A run can be
-reproduced or re-scored from its trace. Save the final op stack and renders to `renders/<run_id>/`, also on
+effort, rounds, render level, budget, canvas (incl. the seed), git commit + dirty flag, a hash of the tool
+list. The seed is `--seed`, or derived from the run id when omitted (crc32), so runs differ in terrain noise
+and comparison order but each can be replayed. A run can be reproduced or re-scored from its trace. Save the final op stack and renders to `renders/<run_id>/`, also on
 a budget stop or crash.
 
 ## 10. Observation: the fidelity ladder
@@ -761,7 +762,9 @@ Implementation details (M4, `agent/harness.py`):
 - **Rule 2** (M5) is symmetric, decided 2026-10-23: fewer passes roll back and more passes keep the
   revision. In the first runs a revision that fixed a spec item (5/7 → 6/7) was rolled back by the
   comparison; objective evidence now takes precedence over the model's preference.
-- **Order.** `random.Random(run_seed * 1000 + round)` decides whether the revision is Terrain 1.
+- **Order.** `random.Random(run_seed * 1000 + round)` decides whether the revision is Terrain 1
+  (`comparison_order`). Until 2026-10-29 `agent.run` never set a seed, so every run used seed 0 and the
+  same order sequence; now the seed comes from `--seed` or the run id (§9.5).
 - **Neutral renders.** Comparison renders use the renderers' neutral titles (size and height range);
   builder and critic renders are titled with the op count, which would reveal recency.
 - **Unusable replies.**

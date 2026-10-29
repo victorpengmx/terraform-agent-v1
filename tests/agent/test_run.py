@@ -8,7 +8,7 @@ from pathlib import Path
 import numpy as np
 
 from agent.budget import Budget
-from agent.run import run_header, save_final
+from agent.run import run_header, run_seed, save_final
 from agent.session import Session
 from agent.tools import control_tools, op_tools
 from agent.tracing import Tracer, TraceRecord
@@ -39,6 +39,16 @@ def test_run_header_records_prompt_references_and_config(tmp_path):
     tracer = Tracer(run_id="t", root=tmp_path)
     tracer.log(TraceRecord(run_id="t", stage="run", step=0, header=header))
     assert json.loads(tracer.path.read_text(encoding="utf-8"))["header"] == header
+
+
+def test_run_seed_comes_from_the_flag_or_the_run_id():
+    assert run_seed(7, "20261029-120000-abcdef") == 7 and run_seed(0, "x") == 0
+    derived = run_seed(None, "20261029-120000-abcdef")
+    assert derived == run_seed(None, "20261029-120000-abcdef")  # reproducible from the trace's run id
+    assert len({run_seed(None, f"20261029-120000-{i:06x}") for i in range(10)}) == 10
+    assert 0 <= derived < 2**31
+    session = Session.flat(16, 16, seed=derived)
+    assert run_header(_args(), [], session, Budget(), {})["canvas"]["seed"] == derived
 
 
 def test_run_header_without_critic():

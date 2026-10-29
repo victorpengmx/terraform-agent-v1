@@ -1,6 +1,6 @@
 """CLI entry point: wires the plumbing together and runs the harness on one prompt.
 
-    python -m agent.run --prompt "a lone volcanic peak" [--image ref.jpg] [--model claude-haiku-5-5]
+    python -m agent.run --prompt "a lone volcanic peak" [--image ref.jpg] [--model claude-haiku-5-5] [--seed 7]
 
 The trace goes to traces/<run_id>.jsonl, starting with a step-0 header record (prompt, reference image hashes,
 models, budgets, canvas, git commit, tool schema hash) so a run can be reproduced or re-scored from its trace alone.
@@ -22,6 +22,7 @@ import hashlib
 import json
 import subprocess
 import sys
+import zlib
 from pathlib import Path
 from typing import Any, Callable
 
@@ -51,6 +52,8 @@ def main() -> None:
     ap.add_argument("--rounds", type=int, default=3, help="max build/critique rounds")
     ap.add_argument("--size", type=int, nargs=2, default=(256, 256), metavar=("W", "D"), help="area in blocks")
     ap.add_argument("--base-y", type=float, default=64.0)
+    ap.add_argument("--seed", type=int, default=None,
+                    help="canvas seed (terrain noise, blind-comparison order); default: derived from the run id")
     ap.add_argument("--max-steps", type=int, default=Budget.max_steps)
     ap.add_argument("--max-cost", type=float, default=Budget.max_cost_usd, help="USD")
     ap.add_argument("--render", choices=["l1", "l2", "none"], default="l2", help="images shown to builder and critic")
@@ -62,8 +65,8 @@ def main() -> None:
     load_dotenv(ENV_FILE, override=False)
     sys.stdout.reconfigure(encoding="utf-8", errors="replace")  # model text (e.g. "≈") on a cp1252 Windows console
 
-    session = Session.flat(*args.size, base_y=args.base_y)
     tracer = Tracer()
+    session = Session.flat(*args.size, base_y=args.base_y, seed=run_seed(args.seed, tracer.run_id))
     out_dir = Path("renders") / tracer.run_id
     observe = [] if args.render == "none" else observe_tools(session, out_dir)
     tools = {t.name: t for t in [*op_tools(session), *control_tools(session), *observe]}
@@ -95,6 +98,12 @@ def main() -> None:
         # The harness leaves the session on the latest accepted attempt, so this is the run's final terrain.
         for path in save_final(session, out_dir):
             print(f"saved {path}")
+
+
+def run_seed(seed: int | None, run_id: str) -> int:
+    """The canvas seed: `--seed` if given, else one derived from the run id, so every run differs and a
+    seedless run can still be reproduced from its trace (the header records the seed either way)."""
+    return seed if seed is not None else zlib.crc32(run_id.encode()) & 0x7FFFFFFF
 
 
 def run_header(args: argparse.Namespace, images: list[bytes], session: Session, budget: Budget, tools: dict[str, Tool]) -> dict[str, Any]:
