@@ -17,8 +17,9 @@ from typing import Annotated, Any, Literal
 
 import numpy as np
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
-from scipy.ndimage import distance_transform_edt, gaussian_filter
+from scipy.ndimage import distance_transform_edt
 
+from terrain.geometry import slope_deg
 from terrain.noise import fractal_noise
 from terrain.state import WorldState
 
@@ -144,8 +145,7 @@ def surface_metrics(state: WorldState) -> tuple[np.ndarray, np.ndarray]:
 
     Slope is taken over a lightly smoothed surface: material should follow the landform, not single-block
     steps, or rock rules speckle grassland wherever detail noise left a 1-block jump."""
-    gz, gx = np.gradient(gaussian_filter(state.height.astype(np.float64), SLOPE_SMOOTHING))
-    slope = np.degrees(np.arctan(np.hypot(gx, gz)))
+    slope = slope_deg(state.height.astype(np.float64), SLOPE_SMOOTHING)
     wet = ~np.isnan(state.water)
     dist = distance_transform_edt(~wet) if wet.any() else np.full(state.height.shape, np.inf)
     return slope, dist

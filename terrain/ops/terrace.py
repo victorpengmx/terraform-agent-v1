@@ -9,9 +9,9 @@ from __future__ import annotations
 
 import numpy as np
 from pydantic import Field
-from scipy.ndimage import gaussian_filter
 
 from terrain.brushes import length_to_blocks
+from terrain.geometry import slope_deg
 from terrain.noise import fractal_noise
 from terrain.ops.character import CharacterParams
 from terrain.ops.region import AreaParams, region_weight
@@ -35,8 +35,7 @@ def terrace(state: WorldState, p: TerraceParams) -> WorldState:
     stream's slope before carve_river). Flat ground is left alone; heights move by at most one step.
     """
     h = state.height.astype(np.float64)
-    gz, gx = np.gradient(gaussian_filter(h, 1.0, mode="nearest"))
-    slope = np.degrees(np.arctan(np.hypot(gx, gz)))
+    slope = slope_deg(h, 1.0, mode="nearest")
     g = np.clip((slope - FLAT_DEG[0]) / (FLAT_DEG[1] - FLAT_DEG[0]), 0.0, 1.0)
     weight = region_weight(state, p.region, length_to_blocks(state, p.edge)) * g * g * (3.0 - 2.0 * g)
 

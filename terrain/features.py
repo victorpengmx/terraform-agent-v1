@@ -19,7 +19,7 @@ import numpy as np
 
 from terrain.materials import surface_metrics
 from terrain.opstack import OpEntry, OpStack, op_seed
-from terrain.state import WorldState
+from terrain.state import WorldState, to_uv
 
 # (name, upper bound): the first class whose bound the value is below.
 SLOPE_CLASSES: tuple[tuple[str, float], ...] = (("gentle", 15.0), ("moderate", 35.0), ("steep", 60.0), ("cliff", math.inf))
@@ -115,13 +115,13 @@ class _Measurer:
             source, mouth = self._uv(first[0]), self._uv(last[-1])
         zz, xx = np.mgrid[0 : state.depth, 0 : state.width]
         w = np.where(mask > FOOTPRINT, mask, 0.0)
-        centroid = (float((xx * w).sum() / w.sum()) / (state.width - 1), float((zz * w).sum() / w.sum()) / (state.depth - 1))
+        centroid = to_uv(state, float((xx * w).sum() / w.sum()), float((zz * w).sum() / w.sum()))
         # Plateaus, mesas, canyons, valleys and basins are defined by their walls: a mean over a flat top or
         # floor would call a sheer mesa "moderate" (mesa demo: mean 26°, 90th percentile 77°).
         mean_slope = float(np.percentile(self.slope[mask > FOOTPRINT], 90)) if walls else float(self.slope[body].mean())
         return FeatureAttributes(
             id=ident, op=op, type=kind, bounds=bounds,
-            top_y=float(state.height[z, x]), top_uv=(x / (state.width - 1), z / (state.depth - 1)),
+            top_y=float(state.height[z, x]), top_uv=to_uv(state, x, z),
             bottom_y=float(state.height[body].min()),
             slope_mean=mean_slope, slope_class=classify(mean_slope, SLOPE_CLASSES),
             edges=touched_edges(mask > FOOTPRINT),
@@ -132,10 +132,10 @@ class _Measurer:
 
     def _extent(self, body: np.ndarray) -> tuple[float, float]:
         zs, xs = np.nonzero(body)
-        return float(xs.max() - xs.min()) / (self.state.width - 1), float(zs.max() - zs.min()) / (self.state.depth - 1)
+        return to_uv(self.state, float(xs.max() - xs.min()), float(zs.max() - zs.min()))
 
     def _uv(self, xz: np.ndarray) -> tuple[float, float]:
-        return float(xz[0]) / (self.state.width - 1), float(xz[1]) / (self.state.depth - 1)
+        return to_uv(self.state, float(xz[0]), float(xz[1]))
 
 
 def measure_features(stack: OpStack) -> dict[str, FeatureAttributes]:
@@ -169,8 +169,8 @@ def measure_spec_feature(stack: OpStack, feature_id: str, kind: str, op_ids: lis
     zs, xs = np.nonzero(mask > FOOTPRINT)
     if not len(zs):
         return None
-    w, d = m.state.width - 1, m.state.depth - 1
-    bounds = (round(xs.min() / w, 3), round(zs.min() / d, 3), round(xs.max() / w, 3), round(zs.max() / d, 3))
+    (u0, v0), (u1, v1) = to_uv(m.state, xs.min(), zs.min()), to_uv(m.state, xs.max(), zs.max())
+    bounds = (round(u0, 3), round(v0, 3), round(u1, 3), round(v1, 3))
     rivers = [e for e in stack.entries if e.id in op_ids and e.op == "carve_river"]
     valleys = [e for e in stack.entries if e.id in op_ids and e.op == "carve_valley"]
     return m.measure(feature_id, "+".join(op_ids), kind, mask, bounds, raised=kind in RAISED_SPEC_TYPES, rivers=rivers,

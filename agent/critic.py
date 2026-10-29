@@ -24,7 +24,7 @@ from terrain.compiler.compile import surface_y, water_top
 from terrain.features import feature_report, measure_features
 from terrain.materials import surface_metrics
 from terrain.ops import list_ops
-from terrain.state import WorldState
+from terrain.state import WorldState, to_uv
 
 Score = Literal[1, 2, 3, 4, 5]  # enum, not min/max: structured outputs reject numeric constraints
 
@@ -224,7 +224,8 @@ def _example(state: WorldState, zx: np.ndarray) -> str:
     if not len(zx):
         return ""
     z, x = zx[len(zx) // 2]
-    return f"; e.g. at u={x / (state.width - 1):.2f}, v={z / (state.depth - 1):.2f}"
+    u, v = to_uv(state, x, z)
+    return f"; e.g. at u={u:.2f}, v={v:.2f}"
 
 
 class CompareOutput(_Strict):

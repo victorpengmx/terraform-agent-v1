@@ -11,7 +11,7 @@ from typing import Literal, Sequence
 import numpy as np
 from scipy.ndimage import gaussian_filter
 
-from terrain.state import WorldState
+from terrain.state import WorldState, to_xz
 
 FalloffKind = Literal["linear", "smoothstep", "gaussian"]
 BlendMode = Literal["add", "max", "min", "lerp_to_target", "smooth"]
@@ -22,7 +22,7 @@ BlendMode = Literal["add", "max", "min", "lerp_to_target", "smooth"]
 
 def to_blocks(state: WorldState, point: Sequence[float]) -> tuple[float, float]:
     """Normalized (u, v) -> block (x, z)."""
-    return point[0] * (state.width - 1), point[1] * (state.depth - 1)
+    return to_xz(state, point[0], point[1])
 
 
 def length_to_blocks(state: WorldState, fraction: float) -> float:

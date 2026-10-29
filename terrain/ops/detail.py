@@ -16,6 +16,7 @@ from pydantic import Field
 from scipy.ndimage import map_coordinates
 
 from terrain.brushes import length_to_blocks
+from terrain.geometry import slope_deg
 from terrain.noise import detail_octaves, fractal_noise
 from terrain.ops.region import AreaParams, region_weight
 from terrain.ops.registry import register_op
@@ -98,6 +99,5 @@ def detail_strength(h: np.ndarray, mask: np.ndarray, weight: str) -> np.ndarray 
         hi = float(h[sel].max()) if sel.any() else float(h.max())
         return np.clip((h - lo) / max(hi - lo, 1e-6), 0.0, 1.0)
     if weight == "slope":
-        gz, gx = np.gradient(h.astype(np.float64))
-        return np.clip(np.degrees(np.arctan(np.hypot(gx, gz))) / 60.0, 0.0, 1.0)
+        return np.clip(slope_deg(h.astype(np.float64)) / 60.0, 0.0, 1.0)
     return 1.0

@@ -11,12 +11,14 @@ from typing import Any, Callable, Sequence
 import numpy as np
 
 from terrain.config import MAX_MEAN_DH
+from terrain.features import FOOTPRINT
+from terrain.geometry import slope_deg
 from terrain.materials import active_rules, rule_coverage, rule_text
 from terrain.ops import OpError, get_op
 from terrain.ops.region import region_shape
 from terrain.ops.registry import validate_params
 from terrain.opstack import BaseSpec, Checkpoint, OpEntry, OpStack
-from terrain.state import WorldState
+from terrain.state import WorldState, to_uv
 
 Snapshot = Checkpoint  # name used by the harness
 OpRecord = OpEntry
@@ -107,12 +109,12 @@ class Session:
 
     def _feature_stats(self, op_id: str) -> str:
         s = self.state
-        sel = s.masks[f"feature:{op_id}"] > 0.02
+        sel = s.masks[f"feature:{op_id}"] > FOOTPRINT
         h = np.where(sel, s.height, -np.inf)
         z, x = np.unravel_index(int(h.argmax()), h.shape)
-        gz, gx = np.gradient(s.height)
-        slope = np.degrees(np.arctan(np.hypot(gx, gz)))[sel]
-        parts = [f"top y={s.height[z, x]:.0f} at (u={x / (s.width - 1):.2f}, v={z / (s.depth - 1):.2f})",
+        slope = slope_deg(s.height)[sel]
+        u, v = to_uv(s, x, z)
+        parts = [f"top y={s.height[z, x]:.0f} at (u={u:.2f}, v={v:.2f})",
                  f"slope max {slope.max():.0f}°, mean {slope.mean():.0f}°", f"{int(sel.sum()):,} columns"]
         wet = sel & ~np.isnan(s.water)
         if wet.any():
@@ -167,10 +169,9 @@ def terrain_stats(s: WorldState) -> str:
     """Terrain statistics as text: the model never reads raw arrays (DESIGN §10). Mentions no op ids, so the
     blind comparison can use it too."""
     h = s.height
-    gz, gx = np.gradient(h)
-    slope = np.degrees(np.arctan(np.hypot(gx, gz)))
+    slope = slope_deg(h)
     peak_z, peak_x = np.unravel_index(int(h.argmax()), h.shape)
-    u, v = peak_x / (s.width - 1), peak_z / (s.depth - 1)
+    u, v = to_uv(s, peak_x, peak_z)
     wet = ~np.isnan(s.water)
     water = f"{wet.mean() * 100:.0f}% of columns under water" if wet.any() else "no water"
     return (

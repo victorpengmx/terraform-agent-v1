@@ -26,6 +26,7 @@ from agent.spec import EDGES, FeatureGraph, bands, span_classes
 from terrain.features import (FOOTPRINT, classify, RAISED_SPEC_TYPES, SLOPE_CLASSES, WALL_SPEC_TYPES, WINDING_CLASSES, FeatureAttributes,
                               category_distance, measure_spec_feature)
 from terrain.opstack import OpStack
+from terrain.state import to_xz
 
 SEPARATION = 0.05  # normalized: centres closer than this are neither left nor right of each other
 HEIGHT_MARGIN = 2.0  # blocks: summits closer than this are neither taller nor lower
@@ -169,7 +170,7 @@ def _relation(r, attrs: dict, ops: dict, stack: OpStack, verb: str = "tagged wit
         return _verdict(ident, text, dist <= SOURCE_REACH,
                         f"source {dist:.0f} blocks from {r.object}; start its path inside {r.object}")
     if r.object in EDGES:
-        x, z = s.mouth_uv[0] * (state.width - 1), s.mouth_uv[1] * (state.depth - 1)
+        x, z = to_xz(state, *s.mouth_uv)
         dist = {"north_edge": z, "south_edge": state.depth - 1 - z, "west_edge": x, "east_edge": state.width - 1 - x}[r.object]
     else:
         dist = _distance_to(stack, ops[r.object], s.mouth_uv)
@@ -185,7 +186,7 @@ def _distance_to(stack: OpStack, op_ids: list[str], uv: tuple[float, float]) -> 
     state = stack.state
     masks = [state.masks[f"feature:{i}"] for i in op_ids if f"feature:{i}" in state.masks]
     inside = np.maximum.reduce(masks) > FOOTPRINT
-    x, z = round(uv[0] * (state.width - 1)), round(uv[1] * (state.depth - 1))
+    x, z = (round(c) for c in to_xz(state, *uv))
     return float(distance_transform_edt(~inside)[z, x])
 
 

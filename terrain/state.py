@@ -83,3 +83,13 @@ class WorldState:
         u = np.linspace(0.0, 1.0, self.width, dtype=np.float32)
         v = np.linspace(0.0, 1.0, self.depth, dtype=np.float32)
         return np.meshgrid(u, v)  # default 'xy' indexing -> shape (depth, width)
+
+
+def to_xz(state: WorldState, u, v):
+    """Normalized (u, v) -> block (x, z), unrounded (the convention in the module docstring)."""
+    return u * (state.width - 1), v * (state.depth - 1)
+
+
+def to_uv(state: WorldState, x, z):
+    """Block (x, z) -> normalized (u, v); also turns block extents into shares of the area."""
+    return x / (state.width - 1), z / (state.depth - 1)

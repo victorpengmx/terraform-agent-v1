@@ -21,7 +21,7 @@ import numpy as np
 
 from terrain.ops import STAGES, OpError, apply_op, get_op
 from terrain.ops.registry import validate_params
-from terrain.state import Feature, WorldState
+from terrain.state import Feature, WorldState, to_uv
 
 ID_PATTERN = re.compile(r"^[a-z][a-z0-9_]{0,39}$")
 CHANGE_EPS = 0.01  # blocks; smaller height/water changes don't count toward a feature footprint
@@ -207,12 +207,12 @@ def _record_feature(before: WorldState, after: WorldState, entry: OpEntry) -> No
     weight = np.where(dh > CHANGE_EPS, dh / max(float(dh.max()), CHANGE_EPS), 0.0)
     weight = np.maximum(weight, water_changed.astype(np.float32)).astype(np.float32)
     zs, xs = np.nonzero(changed)
-    w, d = after.width - 1, after.depth - 1
+    (u0, v0), (u1, v1) = to_uv(after, xs.min(), zs.min()), to_uv(after, xs.max(), zs.max())
     after.masks[f"feature:{entry.id}"] = weight
     after.features[entry.id] = Feature(
         id=entry.id,
         kind=entry.op,
-        bounds=(round(xs.min() / w, 3), round(zs.min() / d, 3), round(xs.max() / w, 3), round(zs.max() / d, 3)),
+        bounds=(round(u0, 3), round(v0, 3), round(u1, 3), round(v1, 3)),
         meta={
             "columns": int(changed.sum()),
             "top_y": round(float(after.height[changed].max()), 1),
