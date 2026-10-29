@@ -848,7 +848,9 @@ depth-ordering questions; compare Haiku, Opus and a depth model.
   rewriting earlier turns (dropping renders, summarizing) is invalid. Each BUILD round opens a fresh
   episode whose first message is generated from state; within it history is append-only. When an episode
   gets long (input tokens or message count), rotate to a new one built from current state. Compaction is
-  cheap because the op list, not the chat, is the source of truth.
+  cheap because the op list, not the chat, is the source of truth. A rotated episode carries the round's
+  critique and rollback feedback, like the round's opening message (fixed 2026-10-29; before, rotation
+  dropped them mid-round).
 - `render_view` images are tool results, so they stay until the episode ends; cap them per run.
 - Scratchpad: a `write_note` tool; notes are pinned into every episode.
 

@@ -67,6 +67,9 @@ class _Run:
     tracer: Tracer
     tracker: BudgetTracker
     step: int = 0
+    # This round's feedback, so an episode rotated mid-round keeps it (DESIGN §13).
+    critique: CritiqueResult | None = None
+    rollback: RollbackFeedback | None = None
 
 
 @dataclass
@@ -121,8 +124,8 @@ def run_task(
     for round_no in range(1, max_rounds + 1):
         result.rounds = round_no
         renders = render(session.state, f"{len(session.ops)} ops") if render and session.ops else []
-        feedback = accepted.critique if accepted else None
-        episode = context.build_episode(session, stage, critique=feedback, renders=renders, rollback=rollback)
+        run.critique, run.rollback = (accepted.critique if accepted else None), rollback
+        episode = context.build_episode(session, stage, critique=run.critique, renders=renders, rollback=rollback)
         outcome = run_stage(run, episode, stage, render)
         result.summary = outcome.summary or result.summary
         if outcome.stop != "done" or critic is None:
@@ -188,7 +191,8 @@ def run_stage(run: _Run, episode: Episode, stage: str, render: Renderer | None =
                 if run.context.should_rotate(episode, u.input_tokens + u.cache_read_tokens + u.cache_write_tokens):
                     # Results are already applied to the session; the new episode is built from it.
                     renders = render(run.session.state, f"{len(run.session.ops)} ops") if render else []
-                    fresh = run.context.build_episode(run.session, stage, renders=renders, continuing=True)
+                    fresh = run.context.build_episode(run.session, stage, critique=run.critique, renders=renders,
+                                                      rollback=run.rollback, continuing=True)
                     episode.messages[:] = fresh.messages  # a new conversation, not an edit of the old one
                     _trace(run, stage, note="episode rotated")
                 else:
