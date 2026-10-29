@@ -160,7 +160,8 @@ whole path, amplitude from width and length) topped out at 1.08–1.30 for meand
   (a spec feature id); code keeps the spec feature → op ids mapping and measures each spec feature over
   the union of its ops' footprints. Ops without a feature are global or supporting edits.
 - [M5, as built] Op tools take an optional `feature`, stored on the op (`OpEntry.feature`, in the stack
-  JSON; `update_op` can retag). Unknown spec ids are an agent-facing error.
+  JSON; `update_op` can retag). Unknown spec ids are an agent-facing error. Tags drive only the in-loop
+  checklist; evaluation matches features without them (§16, "Tag-independent matching").
   - **Measurement:** `measure_spec_feature` works over the union of the tagged ops' footprints. It adds a
     weighted centroid, a river's source and mouth, and the sinuosity of a river or a valley path.
   - **Slope:** for plateaus, mesas, canyons, valleys and basins, slope is the 90th percentile over the
@@ -707,8 +708,10 @@ renders):
 | looks natural; matches mood and palette | VLM, on L2 (and `ref_view`) |
 
 - **Dependencies:** if "river_1 exists" fails, skip its child items. [MVP]
-- **As built in M5** (`agent/checklist.py`). Items:
-  - `<id>.exists` (an untagged feature fails with "pass feature='<id>'")
+- **As built in M5** (`agent/checklist.py`). Two modes with the same items and thresholds: tag mode (the
+  in-loop critic; a feature is measured over the ops tagged with it) and matcher mode (evaluation; the ops
+  `eval/match.py` matched to it, §16). Items:
+  - `<id>.exists` (in tag mode an untagged feature fails with "pass feature='<id>'")
   - `<id>.position`: the centroid is in the band
   - `<id>.slope` and `<id>.winding`: one category of slack, one off = minor
   - `<id>.span_x` and `<id>.span_y`: the body's extent (footprint weight > 0.5) as a share of the area,
@@ -894,6 +897,39 @@ tools. Log every script; recurring ones become tools.
 - **Ablations:** critic on vs. off; SPEC on vs. off (builder gets the raw prompt or image; checks still
   use the hand-written graph). Same prompts and models; 2 seeds if budget allows.
 - Report in `eval/reports/` with honest limitations (small N, judge not human-calibrated).
+
+**Tag-independent matching** (`eval/match.py`, 2026-10-29). The in-loop checklist measures a spec feature
+over the ops the builder tagged with it, which can't grade a build: an untagged correct feature fails, a
+global op tagged with a feature id passes, a hand-written graph's ids never equal the builder's, and SPEC-off
+runs have no tags. For evaluation, code finds the landforms itself and the checklist runs on those matches
+(`checklist(graph, stack, ops=...)`: same items, same thresholds; `match_checklist`):
+1. **Candidates:** every form op with a footprint (`feature_type`); modifier and materials ops never; tags
+   ignored.
+2. **Type compatibility** (preference groups): peak ← peak; ridge, raised area. mountain_range ← ridge, peak,
+   raised area. hills ← peak, raised area, ridge. ridge ← ridge; raised area, peak. plateau, mesa ← plateau;
+   raised area. valley, canyon ← valley; depression. river ← river. lake ← lake. basin ← basin, depression;
+   lake. sea ← sea. island ← raised area, peak, plateau, ridge. other ← any.
+3. **Whole-area edits** (covering ≥ 60% of the columns) match only a sea, or a feature spanning full × full.
+4. **Position gate:** the candidate's centroid lies in the feature's band widened by 0.15 per side; the
+   `position` item still checks the strict band, so a near miss is matched and fails `position`, a feature on
+   the wrong side is unmatched and fails `exists`.
+5. **Size gate:** with `span_x`/`span_y`, the extent class is within one category (the item decides pass or
+   minor).
+6. **Assignment:** at most one candidate per feature and one feature per candidate, by an optimal assignment
+   (`linear_sum_assignment`) over cost = 0.5 × type preference + distance to the strict band + 0.25 × span
+   category distance; it maximizes the number of matched features first.
+7. **Unions** from leftover candidates, for chain types (ridge, plateau, mesa, valley, canyon, river: pieces
+   must touch within 2 blocks) and group types (mountain range, hills: each member's centre in the widened
+   band). Unmatched features first try the cheapest fitting union (touching components, or all members in the
+   band: "a full-width range of three cones"). Then matched features absorb leftovers while the union still
+   fits, each leftover going to the feature whose strict band is nearest.
+8. **part_of:** a parent is measured over its own ops plus its children's.
+9. **Unmatched** features fail `exists`, with the reason (no op of a compatible type; only whole-area ones;
+   none near the band; none of the spec's extent; all taken).
+
+On the 7 saved SPEC runs both modes agree on all 93 checklist items (EVIDENCE 2026-10-29). The matched op
+sets differ from the tags by design: tagged modifier and paint ops, and a lake's dug basin, aren't part of
+the landform.
 
 **[Later]**
 - 30–50 prompts, more references, some sketches.

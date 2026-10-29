@@ -107,6 +107,7 @@ Design text and images together; build text first, then images on the same forma
 
 - [ ] `eval/benchmark.yaml`: ~15 text + ~5 image prompts, each with a hand-written expected feature graph
       (ground truth for the checks)
+- [x] Tag-independent feature matcher for the eval checks (`eval/match.py`, §16)
 - [ ] `eval/run_eval.py`: one row per run (success, judge score, checklist pass rate, steps, tokens, cost,
       latency, tokens/cost per successful build, model ids, git commit); text and image reported separately
 - [ ] SPEC quality: agent graph vs. hand-written graph (features found, categories, relations)

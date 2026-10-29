@@ -1,7 +1,8 @@
 """Spec checklist (DESIGN §11.3): the feature graph turned into atomic items that code checks.
 
-Each spec feature is measured over the union of the footprints of the ops tagged with it
-(`terrain/features.py` `measure_spec_feature`). Items:
+Each spec feature is measured over the union of the footprints of its ops (`terrain/features.py`
+`measure_spec_feature`): in tag mode (the in-loop critic) the ops tagged with it, in matcher mode (evaluation)
+the ops `eval/match.py` matched to it without looking at tags. Items:
 - `<id>.exists`: some tagged op changed the terrain. If it fails, the feature's other items and its relations
   are skipped (dependency skipping, as in the Davidsonian Scene Graph).
 - `<id>.position`: the footprint's centre lies in the band the spec's position projects to (agent/spec.py).
@@ -41,25 +42,37 @@ class Item(BaseModel):
     detail: str = ""
 
 
-def checklist(graph: FeatureGraph, stack: OpStack) -> list[Item]:
-    tagged = {f.id: [e.id for e in stack.entries if e.feature == f.id] for f in graph.features}
+def checklist(graph: FeatureGraph, stack: OpStack, ops: dict[str, list[str]] | None = None,
+              unmatched: dict[str, str] | None = None) -> list[Item]:
+    """Tag mode (`ops` None, the in-loop critic): each spec feature is measured over the ops tagged with it.
+    Matcher mode (evaluation, `eval/match.py`): `ops` maps each spec feature to the ops matched to it, tags
+    are ignored, and `unmatched` says why a feature got no ops. Same items and thresholds in both modes."""
+    matched = ops is not None
+    if ops is None:
+        ops = {f.id: [e.id for e in stack.entries if e.feature == f.id] for f in graph.features}
+    ops = {f.id: ops.get(f.id, []) for f in graph.features}
+    verb = "matched to" if matched else "tagged with"
     attrs: dict[str, FeatureAttributes | None] = {
-        f.id: measure_spec_feature(stack, f.id, f.type, tagged[f.id]) if tagged[f.id] else None for f in graph.features}
+        f.id: measure_spec_feature(stack, f.id, f.type, ops[f.id]) if ops[f.id] else None for f in graph.features}
     items: list[Item] = []
     for f in graph.features:
         a = attrs[f.id]
         if a is None:
-            why = (f"no op is tagged with feature '{f.id}'; pass feature='{f.id}' on the ops that build it"
-                   if not tagged[f.id] else f"the ops tagged '{f.id}' ({', '.join(tagged[f.id])}) changed no terrain")
+            if ops[f.id]:
+                why = f"the ops {verb} '{f.id}' ({', '.join(ops[f.id])}) changed no terrain"
+            elif matched:
+                why = f"no landform in the terrain matches it: {(unmatched or {}).get(f.id, 'no candidate')}"
+            else:
+                why = f"no op is tagged with feature '{f.id}'; pass feature='{f.id}' on the ops that build it"
             items.append(Item(id=f"{f.id}.exists", text=f"{f.id} ({f.type}) exists", status="fail", detail=why))
             items += [Item(id=f"{f.id}.{k}", text=f"{f.id} {k}", status="skipped", detail=f"{f.id} does not exist")
                       for k in _attribute_items(f)]
             continue
         items.append(Item(id=f"{f.id}.exists", text=f"{f.id} ({f.type}) exists", status="pass",
-                          detail=f"ops {', '.join(tagged[f.id])}"))
-        items += _attributes(graph, f, a, attrs)
+                          detail=f"ops {', '.join(ops[f.id])}"))
+        items += _attributes(graph, f, a, attrs, verb)
     for r in graph.relations:
-        items.append(_relation(r, attrs, tagged, stack))
+        items.append(_relation(r, attrs, ops, stack, verb))
     return items
 
 
@@ -73,7 +86,7 @@ def _attribute_items(f) -> list[str]:
     return keys
 
 
-def _attributes(graph: FeatureGraph, f, a: FeatureAttributes, attrs: dict) -> list[Item]:
+def _attributes(graph: FeatureGraph, f, a: FeatureAttributes, attrs: dict, verb: str = "tagged with") -> list[Item]:
     out = []
     u0, u1, v0, v1 = bands(f.position)
     if "position" in _attribute_items(f):
@@ -99,7 +112,7 @@ def _attributes(graph: FeatureGraph, f, a: FeatureAttributes, attrs: dict) -> li
     if f.winding:
         if a.sinuosity is None:
             out.append(Item(id=f"{f.id}.winding", text=f"{f.id} is {f.winding}", status="fail",
-                            detail="no carve_river or carve_valley op is tagged with it"))
+                            detail=f"no carve_river or carve_valley op is {verb} it"))
         else:
             hints = ((f"raise meander on its carve_river op ({WINDING_HINT})", f"lower meander on its carve_river op ({WINDING_HINT})")
                      if a.source_uv is not None else
@@ -129,7 +142,7 @@ def _category(fid: str, key: str, want: str, got: str, classes, measured: str, h
                 detail=f"{measured} ({got})" + ("" if d == 0 else f", spec says {want}; {hint}"))
 
 
-def _relation(r, attrs: dict, tagged: dict, stack: OpStack) -> Item:
+def _relation(r, attrs: dict, ops: dict, stack: OpStack, verb: str = "tagged with") -> Item:
     ident, text = f"{r.subject}.{r.relation}.{r.object}", f"{r.subject} {r.relation} {r.object}"
     s = attrs.get(r.subject)
     o = None if r.object in EDGES else attrs.get(r.object)
@@ -149,17 +162,17 @@ def _relation(r, attrs: dict, tagged: dict, stack: OpStack) -> Item:
         return _verdict(ident, text, diff > HEIGHT_MARGIN, f"summits y={s.top_y:.0f} vs y={o.top_y:.0f}; change height")
     # flows_from / reaches: the subject must be a river.
     if s.source_uv is None:
-        return Item(id=ident, text=text, status="fail", detail=f"{r.subject} has no carve_river op tagged with it")
+        return Item(id=ident, text=text, status="fail", detail=f"{r.subject} has no carve_river op {verb} it")
     state = stack.state
     if rel == "flows_from":
-        dist = _distance_to(stack, tagged[r.object], s.source_uv)
+        dist = _distance_to(stack, ops[r.object], s.source_uv)
         return _verdict(ident, text, dist <= SOURCE_REACH,
                         f"source {dist:.0f} blocks from {r.object}; start its path inside {r.object}")
     if r.object in EDGES:
         x, z = s.mouth_uv[0] * (state.width - 1), s.mouth_uv[1] * (state.depth - 1)
         dist = {"north_edge": z, "south_edge": state.depth - 1 - z, "west_edge": x, "east_edge": state.width - 1 - x}[r.object]
     else:
-        dist = _distance_to(stack, tagged[r.object], s.mouth_uv)
+        dist = _distance_to(stack, ops[r.object], s.mouth_uv)
     return _verdict(ident, text, dist <= MOUTH_REACH, f"mouth {dist:.0f} blocks from {r.object}; end its path there")
 
 
