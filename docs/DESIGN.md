@@ -789,8 +789,8 @@ Implementation details (M4, `agent/harness.py`):
 
 Validation: revision win rate clearly below 100% (above ~90% over 20+ comparisons = still biased); "Terrain
 1" win rate near 50% (else enable both orders); a constructed test (a terrain vs. a broken copy, both
-orders) must pick the intact one. Tools: `scripts/gate_stats.py` (win rates from traces) and
-`scripts/gate_check.py` (broken copy = the valley demo without water plus a heavy fine ridged roughen).
+orders) must pick the intact one. Tools: `scripts/experiments/gate_stats.py` (win rates from traces) and
+`scripts/experiments/gate_check.py` (broken copy = the valley demo without water plus a heavy fine ridged roughen).
 
 ### 11.5 Other critic features
 
@@ -810,7 +810,7 @@ orders) must pick the intact one. Tools: `scripts/gate_stats.py` (win rates from
     fix, valid, tool "none") for M6's fix-validity rate.
   - **Builder:** the builder sees the structured fix after the hint.
   - **Missing tools:** `scripts/missing_tools.py` ranks `"none"` issues across traces.
-  - **A/B:** `scripts/catalogue_ab.py` re-critiques saved runs with and without the catalogue (EVIDENCE
+  - **A/B:** `scripts/experiments/catalogue_ab.py` re-critiques saved runs with and without the catalogue (EVIDENCE
     2026-10-23).
 - [Later] Annotated L1 (§10.4) so issues are located by feature id.
 - [Later] A different-family critic once a second adapter exists.
@@ -1093,7 +1093,7 @@ terraform-agent/
     budget.py, tracing.py, run.py
   eval/                     # benchmark.yaml, run_eval.py, judge.py, reports/
   scripts/                  # hello_amulet, demos, compile_world, calibration_sweep, migrate_stacks, build_block_colors,
-                            # gate_stats, gate_check
+                            # missing_tools, readme_shots; experiments/: catalogue_ab, gate_stats, gate_check
   tests/                    # ops/, agent/ (fake model adapter), backends, compiler, render
   traces/ renders/ worlds/  # gitignored run outputs
 ```

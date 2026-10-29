@@ -19,18 +19,10 @@ from pathlib import Path
 import amulet
 from amulet.api.block import Block
 
+from terrain.backends.amulet_backend import assert_world_closed
+from terrain.backends.base import BackendError
+
 DIM = "minecraft:overworld"
-
-
-def assert_world_closed(world: Path) -> None:
-    # A running game holds an OS lock on session.lock; reading it then fails on Windows.
-    lock = world / "session.lock"
-    if not lock.exists():
-        return
-    try:
-        lock.read_bytes()
-    except OSError as e:
-        raise SystemExit(f"{world} appears to be open in Minecraft ({e}). Close it first.")
 
 
 def find_ground_y(level, x: int, z: int, min_y: int, max_y: int) -> int:
@@ -55,7 +47,10 @@ def main() -> None:
         raise SystemExit(f"{src} is not a Minecraft world (no level.dat).")
     if out.exists():
         raise SystemExit(f"{out} already exists; delete it or pass --out.")
-    assert_world_closed(src)
+    try:
+        assert_world_closed(src)
+    except BackendError as e:
+        raise SystemExit(str(e)) from None
 
     shutil.copytree(src, out, ignore=shutil.ignore_patterns("session.lock"))
     print(f"copied {src.name} -> {out}")

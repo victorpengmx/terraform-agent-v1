@@ -172,7 +172,7 @@ def _fix_text(issue: Issue) -> str:
 class Critic:
     def __init__(self, model: ModelAdapter, catalogue: bool = True) -> None:
         """`catalogue`: append the generated tool catalogue to the system prompt (DESIGN §11.5); off only for
-        the A/B in scripts/catalogue_ab.py. The prompt is built once, so it stays byte-stable (caching)."""
+        the A/B in scripts/experiments/catalogue_ab.py. The prompt is built once, so it stays byte-stable (caching)."""
         self.model = model
         self.system = CRITIC_SYSTEM + ("\n\n" + tool_catalogue() if catalogue else "")
 

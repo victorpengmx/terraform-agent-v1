@@ -1,6 +1,6 @@
 """Broken-copy test for the blind comparison (DESIGN §11.4 validation).
 
-    python -m scripts.gate_check [--model claude-haiku-5-5] [--render l1|l2]
+    python -m scripts.experiments.gate_check [--model claude-haiku-5-5] [--render l1|l2]
 
 Intact terrain: the valley demo. Broken copy: the same stack with its water removed and a heavy, fine,
 uniform ridged roughen on top (spikes, walls, no river or lake). The comparison runs in both orders and

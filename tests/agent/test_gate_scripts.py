@@ -3,8 +3,8 @@ import json
 from agent.critic import AttemptView, Critic
 from agent.tracing import Tracer
 from fakes import ScriptedModel, compare_json
-from scripts.gate_check import check_pair
-from scripts.gate_stats import comparisons, summarize
+from scripts.experiments.gate_check import check_pair
+from scripts.experiments.gate_stats import comparisons, summarize
 
 VIEW = AttemptView(renders=[], stats="area 9x9 blocks")
 

@@ -1,6 +1,6 @@
 """Acceptance-gate validation from traces (DESIGN §11.4): is the blind comparison biased?
 
-    python -m scripts.gate_stats [traces/*.jsonl ...]
+    python -m scripts.experiments.gate_stats [traces/*.jsonl ...]
 
 Reads every blind-comparison record (stage ".../compare") and reports the revision win rate and the
 "Terrain 1" (position) win rate. Healthy: the revision wins clearly less than always (> ~90% over 20+
