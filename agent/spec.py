@@ -13,10 +13,10 @@ import json
 import re
 from typing import Any, Literal
 
-from pydantic import BaseModel, ConfigDict
 
 from agent.models import ModelAdapter, ModelReplyError, ModelResponse, structured_call
 from agent.tools import image_block, text_block
+from terrain.schema import Strict
 
 FeatureType = Literal["peak", "mountain_range", "hills", "ridge", "valley", "canyon", "river", "lake", "sea", "plateau",
                       "mesa", "basin", "island", "other"]
@@ -26,11 +26,7 @@ ID_PATTERN = re.compile(r"^[a-z][a-z0-9_]{0,39}$")
 MAX_FEATURES = 15
 
 
-class _Strict(BaseModel):
-    model_config = ConfigDict(extra="forbid")  # additionalProperties: false, required by structured outputs
-
-
-class Position(_Strict):
+class Position(Strict):
     """Text form (x, y) or image form (image_x, depth); the other pair is null."""
 
     x: Literal["left", "center", "right", "any"] | None
@@ -39,7 +35,7 @@ class Position(_Strict):
     depth: Literal["near", "middle", "far"] | None
 
 
-class SpecFeature(_Strict):
+class SpecFeature(Strict):
     id: str
     type: FeatureType
     position: Position
@@ -52,13 +48,13 @@ class SpecFeature(_Strict):
     notes: str
 
 
-class Relation(_Strict):
+class Relation(Strict):
     subject: str
     relation: RelationKind
     object: str  # a feature id, or north_edge / south_edge / west_edge / east_edge
 
 
-class FeatureGraph(_Strict):
+class FeatureGraph(Strict):
     features: list[SpecFeature]
     relations: list[Relation]
     materials: str

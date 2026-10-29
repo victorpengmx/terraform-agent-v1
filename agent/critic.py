@@ -12,7 +12,7 @@ from dataclasses import dataclass
 from typing import Annotated, Literal
 
 import numpy as np
-from pydantic import BaseModel, ConfigDict, Field, ValidationError
+from pydantic import BaseModel, Field, ValidationError
 from scipy.ndimage import grey_opening
 
 from agent.models import ModelAdapter, ModelReplyError, ModelResponse, structured_call
@@ -24,6 +24,7 @@ from terrain.compiler.compile import surface_y, water_top
 from terrain.features import feature_report, measure_features
 from terrain.materials import surface_metrics
 from terrain.ops import list_ops
+from terrain.schema import Strict
 from terrain.state import WorldState, to_uv
 
 Score = Literal[1, 2, 3, 4, 5]  # enum, not min/max: structured outputs reject numeric constraints
@@ -50,16 +51,12 @@ class CheckResult(BaseModel):
     detail: str = ""
 
 
-class _Strict(BaseModel):
-    model_config = ConfigDict(extra="forbid")  # additionalProperties: false, required by structured outputs
-
-
-class Change(_Strict):
+class Change(Strict):
     param: str = Field(description="Parameter name of the tool")
     value: str = Field(description='New value as JSON, e.g. "0.3", "\\"u\\"" or "[[0.2, 0.5], [0.8, 0.5]]"')
 
 
-class Issue(_Strict):
+class Issue(Strict):
     location: str = Field(description="Op id (e.g. 'raise_peak_1') or normalized 'u,v' position")
     severity: Literal["minor", "major", "blocking"]
     description: str
@@ -71,7 +68,7 @@ class Issue(_Strict):
     fix_hint: str = Field(description="The fix in words; for tool 'none', the capability that is missing")
 
 
-class RubricScores(_Strict):
+class RubricScores(Strict):
     prompt_adherence: Score
     layout: Score
     naturalism: Score
@@ -80,7 +77,7 @@ class RubricScores(_Strict):
     reference_match: Score | None = Field(description="null when there is no reference image")
 
 
-class CritiqueOutput(_Strict):
+class CritiqueOutput(Strict):
     """What the critic model returns. Issues come before scores so the model reasons before rating."""
 
     issues: list[Issue]
@@ -228,7 +225,7 @@ def _example(state: WorldState, zx: np.ndarray) -> str:
     return f"; e.g. at u={u:.2f}, v={v:.2f}"
 
 
-class CompareOutput(_Strict):
+class CompareOutput(Strict):
     """Blind comparison reply. Symmetric fields, strengths before the decision."""
 
     strengths_1: str
