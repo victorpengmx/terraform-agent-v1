@@ -33,11 +33,12 @@ def _image(png: bytes):
     return np.asarray(Image.open(io.BytesIO(png)).convert("RGB"))
 
 
-def test_l2_renders_a_non_blank_image(small_volume):
+@pytest.mark.parametrize("view", ["overview_ne", "overview_s"])
+def test_l2_renders_a_non_blank_image(small_volume, view):
     from terrain.render.l2 import render_volume
 
     _, vol = small_volume
-    img = _image(render_volume(vol, "overview_ne", size_px=256))
+    img = _image(render_volume(vol, view, size_px=256))
     assert img.shape == (256, 256, 3)
     assert img.reshape(-1, 3).std(axis=0).max() > 20  # not a flat background
     green = (img[..., 1] > img[..., 0] + 15) & (img[..., 1] > img[..., 2])

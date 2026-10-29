@@ -145,7 +145,8 @@ def control_tools(session: Session) -> list[Tool]:
     ]
 
 
-VIEWS = {"map": None, "3d_sw": "overview_sw", "3d_ne": "overview_ne", "3d_se": "overview_se", "3d_nw": "overview_nw"}
+VIEWS = {"map": None, "3d_sw": "overview_sw", "3d_ne": "overview_ne", "3d_se": "overview_se", "3d_nw": "overview_nw",
+         "3d_s": "overview_s"}
 VIEW_PX = 512  # ~350 image tokens: cheap enough to look after every big edit
 
 
@@ -197,7 +198,8 @@ def observe_tools(session: Session, out_dir: Path, max_views: int = 12) -> list[
         "type": "object",
         "properties": {
             "view": {"type": "string", "enum": list(VIEWS), "default": "map",
-                     "description": "map: top-down relief with contours. 3d_*: block preview from that corner."},
+                     "description": "map: top-down relief with contours. 3d_*: block preview from that corner; "
+                     "3d_s: from due south, looking north (the viewpoint of a reference photo)."},
             "feature": {"type": "string", "description": "Optional op id: 3D close-up of its footprint."},
         },
         "additionalProperties": False,
@@ -206,7 +208,8 @@ def observe_tools(session: Session, out_dir: Path, max_views: int = 12) -> list[
         name="render_view",
         description="See the terrain now, mid-build. Views are cheap (about as much as a short message): look after "
         "each major landform and before you finish. map: top-down relief with contours, best for overall shape, "
-        "heights and layout. 3d_*: block preview from a corner, for silhouette, cliffs and block colours.",
+        "heights and layout. 3d_*: block preview from a corner (3d_s: from due south, as a reference photo is "
+        "seen), for silhouette, cliffs and block colours.",
         input_schema=schema,
         handler=render_view,
     )]

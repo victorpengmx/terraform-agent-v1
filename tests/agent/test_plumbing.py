@@ -208,6 +208,7 @@ def test_render_view_3d_and_feature_close_up(session, viewer):
     tools, _ = viewer
     execute(tools, tool_use("raise_peak", PEAK | {"id": "hill"}))
     assert view(tools, view="3d_sw")["is_error"] is False
+    assert view(tools, view="3d_s")["is_error"] is False
     close = view(tools, view="3d_ne", feature="hill")
     assert close["is_error"] is False and "3D close-up of hill" in close["content"][0]["text"]
     bad = view(tools, view="3d_ne", feature="nope")

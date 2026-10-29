@@ -627,8 +627,10 @@ not for comparing with perspective photos.
 
 PyVista offscreen. Visible faces only (a face only where a block touches air or water); per-face baked
 shading (fixed brightness per direction + top-face ambient occlusion from taller neighbours) for a crisp
-block look; translucent water. Camera presets `overview_ne/sw/se/nw` and `close_up(feature)` from a
-feature's bounds; later `ref_view` matched to a reference photo (§12). Colours from a script that reads the
+block look; translucent water. Camera presets `overview_ne/sw/se/nw`, `overview_s` (due south looking north,
+1.3× the corner views' distance at the same elevation angle so the near corners stay in frame; the viewpoint
+SPEC assumes for photos) and `close_up(feature)` from a feature's bounds; later `ref_view` matched to a
+reference photo (§12). Colours from a script that reads the
 local 26.3 client jar, follows block-model parents, averages opaque texture pixels and applies plains
 tints, then writes a colour table (numbers only, no textures). Greedy meshing only if speed requires.
 
@@ -843,8 +845,12 @@ building. Design:
 - **Text bands:** left [0, 0.45], center [0.25, 0.75], right [0.55, 1], and the same for back, middle and
   front. The overlap is the one category of slack.
 
-**MVP (minimal):** steps 1, 2 and the critic part of 5 with the standard L2 overview instead of
-`ref_view`: the critic sees the reference next to the L2 overview and fills `reference_match`. Images go
+**MVP (minimal):** steps 1, 2 and the critic part of 5 with a standard L2 overview instead of
+`ref_view`: the critic sees the reference next to the L2 overview and fills `reference_match`. With
+reference images that overview is `overview_s` (camera at the south edge looking north, as SPEC's
+projection assumes), for the builder's round renders, the critic and the blind comparison alike; until
+2026-10-29 it was `overview_sw`, so photo and render were seen from different sides. Text-only runs keep
+`overview_sw`. `render_view` offers `3d_s`. Images go
 through the same SPEC step and feature graph as text, so building, checks and eval are shared. Text and
 image can be combined ("like this photo, but with a lake").
 

@@ -281,7 +281,8 @@ artifacts (rings or stripes of one block, bare stone walls, abrupt switches at o
 Fix materials with set_palette_rules or paint_region; a palette WARNING in the op list (a rule mostly \
 overridden by an earlier rule) is fixed by reordering the rules.
 - reference_match: how well the terrain matches the reference images, null if there are none. The photo is a \
-perspective view; the 3D render is from the south-west corner, so compare the main landforms, their \
+perspective view; with reference images the 3D render is taken from the south edge looking north, the \
+viewpoint the spec assumes for the photo (left = west, near = south), so compare the main landforms, their \
 arrangement (left/right, near/far), proportions, mood and palette, not exact geometry.
 
 3 means acceptable. Reserve 5 for results you would show as a showcase. Locate every issue with an op id \

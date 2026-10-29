@@ -11,7 +11,8 @@ Compile it with `python -m scripts.compile_world --world <dir> --stack renders/<
 
 --render l2 (default): top-down relief map plus a voxel preview of the compiled blocks per observation (a few
 seconds each, needs PyVista); the critic and the blind comparison need the 3D view to judge wall steepness,
-cross-sections and materials. l1: relief map only (fast). none: statistics only, and no render_view tool.
+cross-sections and materials. The preview is from the south-west corner, or with --image from due south
+looking north, the viewpoint SPEC assumes for the photo (final renders then add final_l2_overview_s.png). l1: relief map only (fast). none: statistics only, and no render_view tool.
 With l1 or l2 the builder can also call render_view mid-round (512 px, saved as renders/<run_id>/view_NNN.png).
 """
 
@@ -88,7 +89,7 @@ def main() -> None:
             tracer=tracer,
             budget=budget,
             critic=critic,
-            render=None if args.render == "none" else make_renderer(args.render, out_dir),
+            render=None if args.render == "none" else make_renderer(args.render, out_dir, view=l2_view(images)),
             max_rounds=args.rounds,
             compare_both_orders=args.compare_both_orders,
             use_spec=not args.no_spec,
@@ -96,7 +97,8 @@ def main() -> None:
         print(result)
     finally:
         # The harness leaves the session on the latest accepted attempt, so this is the run's final terrain.
-        for path in save_final(session, out_dir):
+        views = ("overview_ne", "overview_sw", *(["overview_s"] if images else []))
+        for path in save_final(session, out_dir, l2_views=views):
             print(f"saved {path}")
 
 
@@ -170,9 +172,17 @@ def save_final(session: Session, out_dir: Path, l2_views: tuple[str, ...] = ("ov
     return written
 
 
-def make_renderer(level: str, out_dir: Path) -> Callable[[WorldState, str | None], list[bytes]]:
+def l2_view(references: list[bytes]) -> str:
+    """The L2 camera for builder, critic and comparison renders. With reference images: due south looking
+    north, the viewpoint SPEC assumes for a photo (agent/spec.py), so render and photo are comparable;
+    otherwise the south-west corner, which shows two faces of every landform."""
+    return "overview_s" if references else "overview_sw"
+
+
+def make_renderer(level: str, out_dir: Path, view: str = "overview_sw") -> Callable[[WorldState, str | None], list[bytes]]:
     """Harness render callback: PNGs of a terrain, also saved to `out_dir` for inspection. A None title gives
-    the renderers' neutral defaults (size and height range), used by the blind comparison."""
+    the renderers' neutral defaults (size and height range), used by the blind comparison. `view`: the L2
+    camera preset (`l2_view`)."""
     from terrain.render.l1 import render_l1
 
     out_dir.mkdir(parents=True, exist_ok=True)
@@ -185,7 +195,7 @@ def make_renderer(level: str, out_dir: Path) -> Callable[[WorldState, str | None
             from terrain.compiler import compile_state
             from terrain.render.l2 import render_volume
 
-            images.append(render_volume(compile_state(state), "overview_sw", title=title or "overview_sw"))
+            images.append(render_volume(compile_state(state), view, title=title or view))
         for i, png in enumerate(images):
             (out_dir / f"{count:03d}_{i}.png").write_bytes(png)
         count += 1

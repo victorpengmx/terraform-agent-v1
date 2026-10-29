@@ -1,17 +1,22 @@
 """agent.run output: the trace header, final op stack and renders a run leaves behind (no network)."""
 
 import argparse
+import base64
 import hashlib
 import json
 from pathlib import Path
 
 import numpy as np
+import pytest
 
 from agent.budget import Budget
-from agent.run import run_header, run_seed, save_final
+from agent.critic import Critic
+from agent.harness import run_task
+from agent.run import l2_view, make_renderer, run_header, run_seed, save_final
 from agent.session import Session
 from agent.tools import control_tools, op_tools
 from agent.tracing import Tracer, TraceRecord
+from fakes import PEAK, ScriptedModel, compare_json, critique_json, response, text, tool_use
 from terrain.opstack import OpStack
 
 
@@ -56,6 +61,28 @@ def test_run_header_without_critic():
     assert run_header(_args(no_critic=True, critic_model="x"), [], session, Budget(), {})["critic_model"] is None
 
 PNG = b"\x89PNG"
+
+
+@pytest.mark.parametrize("references, camera", [([b"\x89PNG reference photo"], "overview_s"), ([], "overview_sw")])
+def test_the_critic_and_comparison_see_the_reference_camera(tmp_path, monkeypatch, references, camera):
+    import terrain.render.l2 as l2
+
+    monkeypatch.setattr(l2, "render_volume", lambda volume, view, title="", **kw: PNG + b" l2 " + view.encode())
+    session = Session.flat(33, 33, base_y=64)
+    builder = ScriptedModel(response(tool_use("raise_peak", PEAK), stop="tool_use"), response(text("r1")),
+                            response(tool_use("raise_peak", PEAK | {"center": [0.25, 0.25], "radius": 0.2, "height": 10}, id="tu_2"),
+                                     stop="tool_use"), response(text("r2")))
+    critic_model = ScriptedModel(critique_json(3), critique_json(3), compare_json("same"))
+    run_task(prompt="like this photo", images=references, session=session, tools={t.name: t for t in op_tools(session)},
+             model=builder, critic=Critic(critic_model), tracer=Tracer(run_id="t", root=tmp_path), budget=Budget(),
+             render=make_renderer("l2", tmp_path / "r", view=l2_view(references)), max_rounds=2, use_spec=False)
+
+    def l2_views(call):
+        data = [base64.b64decode(b["source"]["data"]) for b in call["messages"][0]["content"] if b["type"] == "image"]
+        return {d.split(b" l2 ")[1].decode() for d in data if b" l2 " in d}
+
+    assert [l2_views(c) for c in critic_model.calls] == [{camera}] * 3  # both critiques and the comparison
+    assert l2_views(builder.calls[2]) == {camera}  # round 2's opening render too
 
 
 def test_save_final_writes_replayable_stack_and_renders(tmp_path):

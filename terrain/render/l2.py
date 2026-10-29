@@ -14,6 +14,7 @@ from __future__ import annotations
 
 import io
 import json
+import math
 from functools import lru_cache
 from pathlib import Path
 
@@ -24,7 +25,13 @@ from terrain.state import Feature
 
 COLORS_FILE = Path(__file__).with_name("block_colors.json")
 FALLBACK_RGB = (200, 0, 200)  # unmistakable: a block missing from the colour table
-VIEWS = ("overview_ne", "overview_sw", "overview_se", "overview_nw")
+VIEWS = ("overview_ne", "overview_sw", "overview_se", "overview_nw", "overview_s")
+# Horizontal camera direction from the area's centre, in (east, north) units of 0.85 × the area's span.
+# overview_s stands due south at the corner views' distance: the viewpoint the spec assumes for photos.
+_VIEW_DIRS = {"ne": (1.0, 1.0), "se": (1.0, -1.0), "sw": (-1.0, -1.0), "nw": (-1.0, 1.0), "s": (0.0, -math.sqrt(2.0))}
+# Seen square-on, the whole width faces the camera, so overview_s backs off (same elevation angle) to keep the
+# near corners, compass and scale bar in frame.
+_VIEW_PULL = {"s": 1.3}
 
 # (axis offset dz, dy, dx), face name, brightness. Bottom faces are never visible from our cameras.
 _DIRS = (
@@ -110,12 +117,13 @@ def _camera(volume: Volume, view: str, feature: Feature | None) -> tuple[tuple, 
         focus = ((x0 + x1) / 2, -(z0 + z1) / 2, top - span * 0.3)
         dist = span * 1.6
         return (focus[0] + dist * 0.6, focus[1] + dist * 0.6, top + dist * 0.55), focus
-    sx = {"ne": 1, "se": 1, "sw": -1, "nw": -1}[view.removeprefix("overview_")]
-    sy = {"ne": 1, "nw": 1, "se": -1, "sw": -1}[view.removeprefix("overview_")]
+    side = view.removeprefix("overview_")
+    sx, sy = _VIEW_DIRS[side]
+    pull = _VIEW_PULL.get(side, 1.0)
     cx, cz = (b.x0 + b.x1) / 2, (b.z0 + b.z1) / 2
     span = max(b.x1 - b.x0, b.z1 - b.z0)
     focus = (cx, -cz, b.y0 + (b.y1 - b.y0) * 0.25)
-    return (cx + sx * span * 0.85, -cz + sy * span * 0.85, b.y1 + span * 0.75), focus
+    return (cx + sx * span * 0.85 * pull, -cz + sy * span * 0.85 * pull, b.y1 + span * 0.75 * pull), focus
 
 
 def render_volume(volume: Volume, view: str = "overview_ne", feature: Feature | None = None, size_px: int = 1024,
@@ -142,7 +150,9 @@ def render_volume(volume: Volume, view: str = "overview_ne", feature: Feature | 
     b = volume.box
     position, focus = _camera(volume, view, feature)
     # North arrow and a 32-block scale bar, floating above the box corner nearest the camera (always in frame).
-    cx = b.x1 - 40 if position[0] > (b.x0 + b.x1) / 2 else b.x0 + 8
+    mid_x = (b.x0 + b.x1) / 2
+    # Seen square-on (overview_s) the near west corner projects to the frame edge, so move it inward.
+    cx = b.x1 - 40 if position[0] > mid_x + 1 else b.x0 + 40 if abs(position[0] - mid_x) <= 1 else b.x0 + 8
     cy = -b.z0 - 40 if position[1] > -(b.z0 + b.z1) / 2 else -b.z1 + 8
     corner = np.array([cx, cy, b.y1 + 4], dtype=float)
     plotter.add_mesh(pv.Arrow(start=corner, direction=(0, 1, 0), scale=24), color="red", lighting=False)
