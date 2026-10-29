@@ -68,6 +68,7 @@ class _Run:
     context: ContextManager
     tracer: Tracer
     tracker: BudgetTracker
+    render: Renderer | None = None
     step: int = 0
     # This round's feedback, so an episode rotated mid-round keeps it (DESIGN §13).
     critique: CritiqueResult | None = None
@@ -109,7 +110,7 @@ def run_task(
     """`graph`: a given feature graph (e.g. a hand-written one); otherwise, with `use_spec`, a SPEC call writes
     one from the prompt and images. `use_spec=False` builds from the raw prompt (no checklist)."""
     run = _Run(session=session, tools={}, tool_params=[], model=model, context=None, tracer=tracer,  # type: ignore[arg-type]
-               tracker=BudgetTracker(budget))
+               tracker=BudgetTracker(budget), render=render)
     if use_spec and graph is None:
         graph = _spec(run, prompt, images)
     spec = {"prompt": prompt, "graph": graph if use_spec else None}
@@ -125,22 +126,22 @@ def run_task(
 
     for round_no in range(1, max_rounds + 1):
         result.rounds = round_no
-        renders = render(session.state, f"{len(session.ops)} ops") if render and session.ops else []
+        renders = _renders(run, session.state, f"{len(session.ops)} ops") if session.ops else []
         run.critique, run.rollback = (accepted.critique if accepted else None), rollback
         episode = context.build_episode(session, stage, critique=run.critique, renders=renders, rollback=rollback)
-        outcome = run_stage(run, episode, stage, render)
+        outcome = run_stage(run, episode, stage)
         result.summary = outcome.summary or result.summary
         if outcome.stop != "done" or critic is None:
             result.stop = outcome.stop
             break
 
         try:
-            attempt = Attempt(round_no, session.snapshot(), _critique(run, critic, spec, stage, render, images))
+            attempt = Attempt(round_no, session.snapshot(), _critique(run, critic, spec, stage, images))
             result.critiques.append(attempt.critique)
             if accepted is None:
                 keep, why = True, "first attempt (baseline)"
             else:
-                keep, why = _gate(run, critic, spec, stage, render, images, accepted, attempt, compare_both_orders)
+                keep, why = _gate(run, critic, spec, stage, images, accepted, attempt, compare_both_orders)
         except _OutOfBudget as e:  # an unjudged revision is never kept; round 1 ends on the built terrain
             result.stop = f"budget: {e}"
             break
@@ -172,7 +173,7 @@ def run_task(
     return result
 
 
-def run_stage(run: _Run, episode: Episode, stage: str, render: Renderer | None = None) -> StageOutcome:
+def run_stage(run: _Run, episode: Episode, stage: str) -> StageOutcome:
     """Inner tool loop for one stage. Appends to `episode` and changes the session through tools."""
     last_text = ""
     while True:
@@ -196,7 +197,7 @@ def run_stage(run: _Run, episode: Episode, stage: str, render: Renderer | None =
                 u = response.usage
                 if run.context.should_rotate(episode, u.input_tokens + u.cache_read_tokens + u.cache_write_tokens):
                     # Results are already applied to the session; the new episode is built from it.
-                    renders = render(run.session.state, f"{len(run.session.ops)} ops") if render else []
+                    renders = _renders(run, run.session.state, f"{len(run.session.ops)} ops")
                     fresh = run.context.build_episode(run.session, stage, critique=run.critique, renders=renders,
                                                       rollback=run.rollback, continuing=True)
                     episode.messages[:] = fresh.messages  # a new conversation, not an edit of the old one
@@ -235,7 +236,7 @@ def _spec(run: _Run, prompt: str, images: list[bytes]) -> FeatureGraph | None:
     return graph
 
 
-def _critique(run: _Run, critic: Critic, spec: dict, stage: str, render: Renderer | None, references: list[bytes]) -> CritiqueResult:
+def _critique(run: _Run, critic: Critic, spec: dict, stage: str, references: list[bytes]) -> CritiqueResult:
     """Critique the current terrain. An unusable critic reply is retried once; a second failure records a
     failed round (programmatic checks only) instead of crashing the run."""
     renders: list[bytes] | None = None
@@ -243,7 +244,7 @@ def _critique(run: _Run, critic: Critic, spec: dict, stage: str, render: Rendere
     def call() -> tuple[CritiqueResult, ModelResponse | None]:
         nonlocal renders
         if renders is None:  # rendered once, after the first budget check
-            renders = render(run.session.state, f"{len(run.session.ops)} ops") if render else []
+            renders = _renders(run, run.session.state, f"{len(run.session.ops)} ops")
         return critic.critique(spec, run.session, renders=renders, references=references)
 
     out, error = _retry_once(run, f"{stage}/critique", "critic", call, budget="critique")
@@ -261,7 +262,7 @@ def _critique(run: _Run, critic: Critic, spec: dict, stage: str, render: Rendere
     return critique
 
 
-def _gate(run: _Run, critic: Critic, spec: dict, stage: str, render: Renderer | None, references: list[bytes],
+def _gate(run: _Run, critic: Critic, spec: dict, stage: str, references: list[bytes],
           accepted: Attempt, revision: Attempt, both_orders: bool) -> tuple[bool, str]:
     """Acceptance gate (DESIGN §11.4): (keep the revision?, why).
 
@@ -286,8 +287,8 @@ def _gate(run: _Run, critic: Critic, spec: dict, stage: str, render: Renderer | 
 
     # Rule 3: blind comparison in a seeded random order; only a win for the accepted attempt rolls back.
     _check_budget(run, f"{stage}/compare", "comparison")  # before rendering both attempts
-    previous = AttemptView(render(accepted.checkpoint.state, None) if render else [], terrain_stats(accepted.checkpoint.state))
-    current = AttemptView(render(revision.checkpoint.state, None) if render else [], terrain_stats(revision.checkpoint.state))
+    previous = AttemptView(_renders(run, accepted.checkpoint.state, None), terrain_stats(accepted.checkpoint.state))
+    current = AttemptView(_renders(run, revision.checkpoint.state, None), terrain_stats(revision.checkpoint.state))
     revision_first = comparison_order(run.session.stack.base.seed, revision.round)
     orders = [revision_first, not revision_first] if both_orders else [revision_first]
     verdicts = [_compare(run, critic, spec, stage, references, previous, current, rev_first, revision.round) for rev_first in orders]
@@ -352,6 +353,11 @@ def _check_budget(run: _Run, stage: str, call: str) -> None:
     if (reason := run.tracker.exceeded()) is not None:
         _trace(run, stage, note=f"{call} skipped: budget: {reason}")
         raise _OutOfBudget(reason)
+
+
+def _renders(run: _Run, state: WorldState, title: str | None) -> list[bytes]:
+    """Images of `state` from the run's renderer, or none without one."""
+    return run.render(state, title) if run.render else []
 
 
 def _charge(run: _Run, response: ModelResponse) -> None:
