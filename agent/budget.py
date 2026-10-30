@@ -22,24 +22,34 @@ class Budget:
 class BudgetTracker:
     budget: Budget
     steps: int = 0
-    cost_usd: float = 0.0
+    cost_usd: float = 0.0  # priced calls only; see unpriced_calls
+    unpriced_calls: int = 0  # calls on a model without a price: the total is unknown, not cost_usd
     usage: Usage = field(default_factory=Usage)
     started: float = field(default_factory=time.monotonic)
 
     def charge(self, usage: Usage, cost_usd: float | None) -> None:
         self.steps += 1
-        self.cost_usd += cost_usd or 0.0
+        if cost_usd is None:
+            self.unpriced_calls += 1
+        else:
+            self.cost_usd += cost_usd
         self.usage.input_tokens += usage.input_tokens
         self.usage.output_tokens += usage.output_tokens
         self.usage.cache_read_tokens += usage.cache_read_tokens
         self.usage.cache_write_tokens += usage.cache_write_tokens
+
+    def cost_text(self) -> str:
+        """"$0.12", or "cost unknown (...)" when any call had no price."""
+        if self.unpriced_calls:
+            return f"cost unknown ({self.unpriced_calls} unpriced call(s); ${self.cost_usd:.2f} priced)"
+        return f"${self.cost_usd:.2f}"
 
     def exceeded(self) -> str | None:
         """Reason the budget is spent, or None. Phrased so it can be shown to the agent or the user."""
         b = self.budget
         if self.steps >= b.max_steps:
             return f"step budget reached ({self.steps}/{b.max_steps} model calls)"
-        if self.cost_usd >= b.max_cost_usd:
+        if self.cost_usd >= b.max_cost_usd:  # priced calls only: unpriced ones can't be capped
             return f"cost budget reached (${self.cost_usd:.2f}/${b.max_cost_usd:.2f})"
         elapsed = time.monotonic() - self.started
         if elapsed >= b.max_seconds:

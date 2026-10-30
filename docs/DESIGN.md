@@ -501,7 +501,10 @@ class WorldBackend(ABC):
 
 Model call → execute tool calls → feed back results or errors, until the model ends its turn, a budget
 stops it or it refuses. Handle every stop reason explicitly: `tool_use`; `end_turn`; `max_tokens`
-(truncated tool calls are not run; ask for a re-issue); `pause_turn` (resend); `refusal`. Budgets: model
+(truncated tool calls are not run; ask for a re-issue); `malformed_tool_call` (the provider couldn't
+parse the call, so nothing ran; tell the model and ask for a re-issue; two in a row end the stage);
+`pause_turn` (resend); `refusal`. A model call that raises (API error, unusable reply) is traced, and charged
+when a reply came back, before it propagates. Budgets: model
 calls (builder + critic), cost, wall time; critique rounds. The budget is checked before every model call:
 each builder call, each critique and comparison, and each of their retries. When it runs out before a
 critic or comparison call, the run stops with `budget: …` on the latest accepted attempt; an unjudged
@@ -582,9 +585,45 @@ relations (`surrounds`, `between`, `along`).
 - [MVP] One adapter interface for every role; Anthropic first. Messages and tools may use the Anthropic
   format internally; other providers translate at the adapter boundary. A price table drives budgets and
   reports.
-- [Later] Portability: provider SDKs only inside adapters; capability flags (images, caching, parallel
-  tools, JSON-schema output), not provider checks; normalized usage and cost; retries and rate limits in
-  the adapter; contract tests with recorded responses.
+- [Done] Gemini adapter (`agent/gemini.py`, `google-genai`, `models.generate_content`, stateless). The
+  provider comes from `ModelConfig.provider`, inferred from the id prefix (`claude-` / `gemini-`).
+  `make_adapter(config)` builds the adapter; `agent.run` (`--model`, `--critic-model`) and the critic
+  experiments use it. Provider SDKs are imported only in adapters; `google-genai` is the optional `[gemini]`
+  extra, imported lazily. The run header records provider and model per role (builder, spec, critic,
+  comparison). Contract tests replay REST-shaped replies through the SDK's own response types.
+  Translation at the boundary:
+  - system → `system_instruction`; images → inline data; tools → function declarations;
+    `response_schema` → JSON mode with `response_json_schema`.
+  - tool_result → function response (`{"output"}` or `{"error"}`; images in `parts`).
+  - Effort maps to `thinking_level` (xhigh and max → high). `thinking_display="summarized"` →
+    `include_thoughts`.
+  - Retries: 429/5xx/transport errors, 4 retries with exponential backoff (the SDK retries nothing by default).
+    Each failed try is recorded (`ModelResponse.retries`: error, try_s, wait_s) and traced, so slow serving
+    and rate limiting can be told apart. The SDK sends requests without a timeout, so each try gets 180 s,
+    and a timeout is retried once. Requests run on a daemon thread while the caller waits in 0.2 s slices:
+    on Windows, Ctrl+C can't interrupt a blocked socket read.
+  - Schema conversion (`agent/gemini_schema.py`, a copy; ours stay as they are): `$defs`/`$ref` inlined;
+    `oneOf` + `discriminator` → `anyOf` with the tag required in each branch; `const` → one-value `enum`;
+    `exclusiveMinimum` → `minimum` + a note; `default` and `propertyNames` keys → description;
+    `minLength` dropped. Pydantic still validates everything on our side.
+
+  Known differences from Anthropic:
+  - **Caching:** implicit, no breakpoints and no write charge. `cached_content_token_count` (included in
+    `prompt_token_count`) → cache_read.
+  - **Call ids:** optional; missing ones are generated (`gc_<response_id>_<n>`). Tool results find their
+    call by scanning the history, so the adapter is stateless.
+  - **Thought signatures:** each reply block keeps its original `Part` and is sent back as that Part. On
+    Gemini 3 a missing signature on a function-call part is a 400; only the first call in a parallel batch
+    carries one. All calls must come first, then all responses in call order (as the harness sends them).
+  - **Stop reasons:** STOP → tool_use/end_turn; MAX_TOKENS → max_tokens; SAFETY, RECITATION, BLOCKLIST,
+    PROHIBITED_CONTENT, SPII, IMAGE_SAFETY/PROHIBITED_CONTENT/RECITATION and prompt blocks → refusal (with
+    reason, message, ratings); MALFORMED_FUNCTION_CALL → malformed_tool_call. Anything else raises
+    `GeminiStopError` (a `ModelReplyError` carrying the response, so it's charged and structured calls retry once).
+    Adjacent same-role turns are merged (a malformed reply has no parts, so its feedback joins the previous user turn).
+  - **Other:** no server-side refusal fallback. Thinking tokens are billed as output. Prices missing from the
+    table make cost "unknown" (never $0), and then the cost budget can't be enforced.
+- [Later] Capability flags (images, caching, parallel tools, JSON-schema output) once a provider lacks one;
+  a different-family critic and judge, chosen by evaluation.
 
 | Role | Needs | Choice |
 |---|---|---|
@@ -599,7 +638,7 @@ Model choices are decided by the benchmark and human calibration, not public lea
 ### 9.5 Tracing [MVP]
 
 One JSONL record per step: run id, stage, step, model, request id, stop reason, tokens (incl. cache),
-cost, latency, assistant text, tool calls (name, input, result, error flag), critic output, and a note
+cost, latency (and the adapter's retries behind it), assistant text, tool calls (name, input, result, error flag), critic output, and a note
 (rollbacks, rotations, run end). Step 0 holds a header: prompt, reference image paths + hashes, models,
 effort, rounds, render level, budget, canvas (incl. the seed), git commit + dirty flag, a hash of the tool
 list. The seed is `--seed`, or derived from the run id when omitted (crc32), so runs differ in terrain noise

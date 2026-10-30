@@ -29,6 +29,7 @@ class TraceRecord:
     usage: dict[str, int] | None = None
     cost_usd: float | None = None
     latency_s: float | None = None
+    retries: list[dict[str, Any]] | None = None  # adapter retries behind this step ({error, try_s, wait_s}), if any
     text: str | None = None  # assistant text this step (not thinking)
     tool_calls: list[dict[str, Any]] = field(default_factory=list)  # [{name, input, result, is_error}]
     render_paths: list[str] = field(default_factory=list)

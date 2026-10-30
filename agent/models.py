@@ -16,11 +16,21 @@ from pydantic import BaseModel, ValidationError
 
 Effort = Literal["low", "medium", "high", "xhigh", "max"]
 
-# USD per million tokens (Anthropic list prices, Oct 2026). Used for budgets and eval reports only.
-PRICES: dict[str, dict[str, float]] = {
+# USD per million tokens. Used for budgets and eval reports only. A missing price (None) makes a call's
+# cost unknown, never $0.
+PRICES: dict[str, dict[str, float | None]] = {
+    # Anthropic list prices, Oct 2026.
     "claude-opus-5-5": {"input": 4.00, "output": 20.00, "cache_read": 0.20},
     "claude-sonnet-5-5": {"input": 2.00, "output": 10.00, "cache_read": 0.20},
     "claude-haiku-5-5": {"input": 0.10, "output": 0.50, "cache_read": 0.01},  # cache_read assumed 0.1x input
+    # Gemini: ids from https://ai.google.dev/gemini-api/docs/models (2026-10-30). Output includes thinking tokens;
+    # cache_read is the context-caching (implicit cache hit) price.
+    # TODO(victor): fill in from https://ai.google.dev/gemini-api/docs/pricing (Standard tier).
+    # gemini-3.1-pro-preview is priced in two tiers by prompt length; this table holds one rate.
+    "gemini-4-argon": {"input": None, "output": None, "cache_read": None},
+    "gemini-3.8-flash": {"input": None, "output": None, "cache_read": None},
+    "gemini-3.6-flash": {"input": None, "output": None, "cache_read": None},
+    "gemini-3.1-pro-preview": {"input": None, "output": None, "cache_read": None},
 }
 CACHE_WRITE_MULTIPLIER = 1.25  # 5-minute TTL cache writes
 
@@ -28,13 +38,28 @@ CACHE_WRITE_MULTIPLIER = 1.25  # 5-minute TTL cache writes
 FALLBACK_MODELS = {"claude-opus-5-5", "claude-opus-5", "claude-fable-5-1", "claude-sonnet-5-5"}
 
 
+Provider = Literal["anthropic", "gemini"]
+PROVIDER_PREFIXES: dict[str, Provider] = {"claude-": "anthropic", "gemini-": "gemini"}
+
+
 @dataclass(frozen=True)
 class ModelConfig:
     model: str = "claude-opus-5-5"
     max_tokens: int = 16000  # thinking counts against this; don't lowball it
     effort: Effort | None = "high"  # Opus 5.5 defaults to "medium" if unset
-    refusal_fallback: bool = True  # re-run declined requests on a fallback model (where supported)
+    refusal_fallback: bool = True  # re-run declined requests on a fallback model (where supported; Anthropic only)
     thinking_display: Literal["omitted", "summarized"] | None = None  # "summarized" = readable reasoning in traces
+    provider: Provider | None = None  # None: inferred from the model id prefix
+
+    def __post_init__(self) -> None:
+        if self.provider is None:
+            inferred = next((p for prefix, p in PROVIDER_PREFIXES.items() if self.model.startswith(prefix)), None)
+            if inferred is None:
+                raise ValueError(f"can't infer the provider of model {self.model!r}: ids start with "
+                                 f"{' or '.join(PROVIDER_PREFIXES)}, or pass provider= ({' | '.join(PROVIDER_PREFIXES.values())})")
+            object.__setattr__(self, "provider", inferred)
+        elif self.provider not in PROVIDER_PREFIXES.values():
+            raise ValueError(f"unknown provider {self.provider!r}; use {' or '.join(PROVIDER_PREFIXES.values())}")
 
 
 @dataclass
@@ -45,15 +70,21 @@ class Usage:
     cache_write_tokens: int = 0
 
     def cost_usd(self, model: str) -> float | None:
-        p = PRICES.get(model)
-        if p is None:
+        """None when the model or one of its prices is unknown (reported as "unknown", never as $0)."""
+        if not price_known(model):
             return None
+        p = PRICES[model]
         return (
             self.input_tokens * p["input"]
             + self.output_tokens * p["output"]
             + self.cache_read_tokens * p["cache_read"]
             + self.cache_write_tokens * p["input"] * CACHE_WRITE_MULTIPLIER
         ) / 1e6
+
+
+def price_known(model: str) -> bool:
+    p = PRICES.get(model)
+    return p is not None and all(v is not None for v in p.values())
 
 
 @dataclass
@@ -65,6 +96,9 @@ class ModelResponse:
     request_id: str | None
     latency_s: float
     stop_details: Any = None  # populated only for refusals
+    # Failed tries the adapter retried before this reply ({error, try_s, wait_s}); latency_s includes them.
+    # Empty for Anthropic, whose SDK retries internally without reporting it.
+    retries: list[dict[str, Any]] = field(default_factory=list)
 
     @property
     def tool_uses(self) -> list[Any]:
@@ -176,3 +210,13 @@ class AnthropicAdapter:
             latency_s=latency,
             stop_details=getattr(msg, "stop_details", None),
         )
+
+
+def make_adapter(config: ModelConfig) -> ModelAdapter:
+    """The adapter for `config.provider`. Provider SDKs other than Anthropic's are imported only here, lazily,
+    so an install without their extras still works."""
+    if config.provider == "gemini":
+        from agent.gemini import GeminiAdapter
+
+        return GeminiAdapter(config)
+    return AnthropicAdapter(config)

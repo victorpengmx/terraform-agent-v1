@@ -20,6 +20,7 @@ dependencies = [
 [project.optional-dependencies]
 render = ["matplotlib", "pyvista", "pillow"]
 dev = ["pytest"]
+gemini = ["google-genai>=2.34,<3"]  # GeminiAdapter (agent/gemini.py); imported lazily
 
 [tool.setuptools.packages.find]
 include = ["terrain*", "agent*", "eval*", "mcp_server*", "scripts*"]

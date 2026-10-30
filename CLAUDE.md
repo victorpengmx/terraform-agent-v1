@@ -46,6 +46,7 @@ design, context management, critique, evaluation), not prompts on top of an API.
 - **amulet-core==1.9.49** (stable; first with 26.3 support). Don't use the 2.0.x alphas or any pre-release.
 - matplotlib (L1 renders), PyVista offscreen (L2 voxel previews), Pillow
 - anthropic SDK (first provider adapter), python-dotenv (`.env` holds `ANTHROPIC_API_KEY`; gitignored)
+- google-genai (optional `[gemini]` extra; `.env` holds `GEMINI_API_KEY`), imported only inside `agent/gemini.py`
 - pytest
 - Later: official Python MCP SDK; Java 25+ and a stable Paper build for 26.3 (live backend)
 
@@ -54,6 +55,9 @@ design, context management, critique, evaluation), not prompts on top of an API.
 - Dev/debug runs: Claude Haiku 5.5 (cheap; use it while building plumbing)
 - Builder for real runs: Claude Opus 5.5
 - Critic: same adapter at first; a different model family later
+- Gemini (any role): pass a `gemini-...` id to `--model` / `--critic-model`; the provider is inferred from the
+  prefix and `make_adapter` builds the adapter. Gemini prices in `agent/models.py` are TODO (None): until
+  they're filled in, cost is reported as "unknown" and the cost budget isn't enforced
 - Eval judge: a prompt (later a model) separate from the in-loop critic
 - Record exact model ids in every eval report.
 
@@ -86,9 +90,11 @@ design, context management, critique, evaluation), not prompts on top of an API.
 
 Fill in as they are created.
 
-- Setup: `python -m venv .venv` then `.venv\Scripts\python -m pip install -e ".[dev,render]"`
+- Setup: `python -m venv .venv` then `.venv\Scripts\python -m pip install -e ".[dev,render,gemini]"`
+  (`gemini` is optional: without it everything except the Gemini adapter works, and its contract tests skip)
 - Tests: `pytest`
 - Run agent: `python -m agent.run --prompt "..."`
+- Gemini smoke check (paid): `python -m scripts.experiments.gemini_smoke --model gemini-...`
 - Benchmark: `python -m eval.run_eval --suite eval/benchmark.yaml`
 
 ## Working agreement for sessions

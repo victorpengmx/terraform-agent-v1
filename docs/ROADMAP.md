@@ -144,6 +144,8 @@ Pick by benchmark failures, not by appeal.
 - [ ] Annotated L1 renders + labels-vs-no-labels experiment (§10.4)
 - [ ] More checks: large single-block areas, feature collisions, river connectivity, feature drift
 - [ ] Second provider adapter; different-family critic and judge (§9.4)
+      Gemini adapter done (`agent/gemini.py`, offline contract tests); live smoke run, prices, and the
+      different-family critic/judge evaluation still open.
 
 ### C. Tools (§5.10, §5.11, §6)
 - [ ] Graded `carve_valley`; mountain-range recipe (`raise_ridge` done early, M4.5)

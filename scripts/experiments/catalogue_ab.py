@@ -50,7 +50,7 @@ def summarize(rows: list[dict]) -> dict:
 
 
 def main() -> None:
-    from agent.models import AnthropicAdapter, ModelConfig
+    from agent.models import ModelConfig, make_adapter
     from agent.run import ENV_FILE, make_renderer
 
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
@@ -66,11 +66,11 @@ def main() -> None:
     tracer.run_id = f"catalogue_ab-{tracer.run_id}"
     tracer.path = tracer.path.with_name(f"{tracer.run_id}.jsonl")
     render = make_renderer("l2", Path("renders") / tracer.run_id)
-    arms = {"without": Critic(AnthropicAdapter(ModelConfig(model=args.model, effort=args.effort)), catalogue=False),
-            "with": Critic(AnthropicAdapter(ModelConfig(model=args.model, effort=args.effort)), catalogue=True)}
+    arms = {"without": Critic(make_adapter(ModelConfig(model=args.model, effort=args.effort)), catalogue=False),
+            "with": Critic(make_adapter(ModelConfig(model=args.model, effort=args.effort)), catalogue=True)}
     arms = {arm: critic for arm, critic in arms.items() if arm in args.arms}
     rows: dict[str, list[dict]] = {arm: [] for arm in arms}
-    cost, step = 0.0, 0
+    cost, unpriced, step = 0.0, 0, 0
     for run_id, prompt, stack in saved_runs(args.limit):
         session = Session(stack)
         renders = render(stack.state, f"{len(stack)} ops")
@@ -83,7 +83,8 @@ def main() -> None:
                     print(f"{run_id} {arm}: critic failed (try {attempt}): {e}")
                     critique, response = None, e.response
             if response is not None:
-                cost += response.usage.cost_usd(response.model) or 0.0
+                call_cost = response.usage.cost_usd(response.model)
+                cost, unpriced = cost + (call_cost or 0.0), unpriced + (call_cost is None)
             if critique is None:
                 continue
             for i in critique.issues:
@@ -102,7 +103,8 @@ def main() -> None:
               f"fixes valid as written {s['fixes_valid']}/{s['fixes']}; problems {s['problem_kinds']}")
         for hint, n in s["missing"]:
             print(f"   missing tool ({n}x): {hint}")
-    print(f"\ncost ${cost:.3f}; trace {tracer.path}")
+    cost_text = f"unknown ({unpriced} unpriced calls; ${cost:.3f} priced)" if unpriced else f"${cost:.3f}"
+    print(f"\ncost {cost_text}; trace {tracer.path}")
 
 
 if __name__ == "__main__":

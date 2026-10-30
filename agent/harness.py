@@ -3,7 +3,8 @@
 Grown from a port of Thorsten Ball's "How to Build an Agent". Two layers:
 
 - `run_stage`: the inner tool loop. Model call -> execute tool calls -> feed results back, until the
-  model ends its turn, the budget runs out or the model refuses. Branches on stop_reason explicitly.
+  model ends its turn, the budget runs out or the model refuses. Branches on stop_reason explicitly; a
+  malformed tool call (a provider couldn't parse it) goes back to the model, and two in a row end the stage.
 - `run_task`: the outer loop. BUILD -> CRITIQUE -> (REVISE | ACCEPT), up to `max_rounds`, with the
   acceptance gate of DESIGN §11.4: the first attempt is the baseline; a revision is rolled back if it
   fails a blocking/major check the accepted attempt passed, passes fewer spec checklist items, or a blind
@@ -35,6 +36,7 @@ from terrain.state import WorldState
 # used for the blind comparison so no image says how many ops built it.
 Renderer = Callable[[WorldState, str | None], list[bytes]]
 Winner = Literal["revision", "previous", "same"]
+MAX_MALFORMED_CALLS = 2  # consecutive malformed tool calls before a stage stops
 _T = TypeVar("_T")
 
 
@@ -47,14 +49,15 @@ class RunResult:
     critiques: list[CritiqueResult] = field(default_factory=list)
     accepted_round: int | None = None  # the attempt the run ended on (None without a critic)
     score: float | None = None  # its mean rubric score, for reports only (never used to gate)
-    cost_usd: float = 0.0
+    cost_usd: float | None = 0.0  # None when some call had no price (unknown, not $0)
+    cost_text: str = "$0.00"  # as printed: "$0.12" or "cost unknown (...)"
     summary: str = ""  # builder's final text
     graph: FeatureGraph | None = None  # the spec's feature graph, if the run had one
 
     def __str__(self) -> str:
         kept = "n/a" if self.accepted_round is None else f"round {self.accepted_round} (score {self.score:.2f})"
         return (f"run {self.run_id}: {self.stop} after {self.rounds} round(s); kept {kept}; "
-                f"${self.cost_usd:.2f}\n{self.session.stats()}\n{self.session.summary()}\n\n{self.summary}")
+                f"{self.cost_text}\n{self.session.stats()}\n{self.session.summary()}\n\n{self.summary}")
 
 
 @dataclass
@@ -168,7 +171,8 @@ def run_task(
     if accepted is not None:
         session.restore(accepted.checkpoint)  # always finish on the latest accepted attempt
         result.accepted_round, result.score = accepted.round, accepted.critique.score
-    result.cost_usd = run.tracker.cost_usd
+    result.cost_usd = None if run.tracker.unpriced_calls else run.tracker.cost_usd
+    result.cost_text = run.tracker.cost_text()
     _trace(run, stage, note=f"run ended: {result.stop}")
     return result
 
@@ -176,12 +180,21 @@ def run_task(
 def run_stage(run: _Run, episode: Episode, stage: str) -> StageOutcome:
     """Inner tool loop for one stage. Appends to `episode` and changes the session through tools."""
     last_text = ""
+    malformed = 0  # consecutive malformed tool calls
     while True:
         if (reason := run.tracker.exceeded()) is not None:
             return StageOutcome(stop=f"budget: {reason}", summary=last_text)
 
-        response = run.model.complete(episode.messages, system=run.context.system_prompt(), tools=run.tool_params)
+        try:
+            response = run.model.complete(episode.messages, system=run.context.system_prompt(), tools=run.tool_params)
+        except Exception as e:  # an API error or unusable reply: charge and trace what came back, then let it propagate
+            failed = e.response if isinstance(e, ModelReplyError) else None
+            if failed is not None:
+                _charge(run, failed)
+            _trace(run, stage, failed, note=f"model call failed: {type(e).__name__}: {e}")
+            raise
         _charge(run, response)
+        malformed = malformed + 1 if response.stop_reason == "malformed_tool_call" else 0
         episode.messages.append({"role": "assistant", "content": response.content})
         last_text = response.text or last_text
 
@@ -213,12 +226,24 @@ def run_stage(run: _Run, episode: Episode, stage: str) -> StageOutcome:
                 cut = [tool_result(tu.id, "This call was cut off by the output limit and was not run. Re-issue it.", is_error=True)
                        for tu in response.tool_uses]
                 episode.messages.append({"role": "user", "content": cut or "Your reply was cut off by the output limit. Continue, more briefly."})
+            case "malformed_tool_call":
+                # The provider couldn't parse the model's call, so nothing ran: say so and ask for a re-issue.
+                detail = (response.stop_details or {}).get("message")
+                if malformed >= MAX_MALFORMED_CALLS:
+                    _trace(run, stage, response, note=f"malformed tool call {malformed} times in a row; stopping")
+                    return StageOutcome(stop=f"malformed tool calls: {malformed} in a row", summary=last_text)
+                _trace(run, stage, response, note=f"malformed tool call ({detail or 'no details'}); asked to re-issue")
+                why = f"Your last tool call was malformed and was not run{f' ({detail})' if detail else ''}."
+                bad = [tool_result(tu.id, f"{why} Re-issue it.", is_error=True) for tu in response.tool_uses]
+                episode.messages.append({"role": "user", "content": bad or f"{why} Re-issue it as one function call "
+                                         "whose arguments are valid JSON matching the tool's schema."})
             case "pause_turn":
                 _trace(run, stage, response, note="pause_turn; resuming")  # resend as-is so the model continues
             case "refusal":
                 _trace(run, stage, response, note=f"refusal: {response.stop_details}")
                 return StageOutcome(stop=f"refused: {response.stop_details}", summary=last_text)
             case other:
+                _trace(run, stage, response, note=f"unhandled stop_reason {other!r}")
                 raise RuntimeError(f"unhandled stop_reason {other!r}")
 
 
@@ -383,5 +408,6 @@ def _trace(run: _Run, stage: str, response: ModelResponse | None = None, **field
         record.usage = {"input": u.input_tokens, "output": u.output_tokens, "cache_read": u.cache_read_tokens, "cache_write": u.cache_write_tokens}
         record.cost_usd = u.cost_usd(response.model)
         record.latency_s = round(response.latency_s, 3)
+        record.retries = response.retries or None
         record.text = response.text or None
     run.tracer.log(record)

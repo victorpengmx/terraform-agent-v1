@@ -2,6 +2,9 @@
 
     python -m agent.run --prompt "a lone volcanic peak" [--image ref.jpg] [--model claude-haiku-5-5] [--seed 7]
 
+--model and --critic-model take Anthropic (claude-...) or Gemini (gemini-..., needs the gemini extra) ids. SPEC
+runs on the builder's model and the blind comparison on the critic's.
+
 The trace goes to traces/<run_id>.jsonl, starting with a step-0 header record (prompt, reference image hashes,
 models, budgets, canvas, git commit, tool schema hash) so a run can be reproduced or re-scored from its trace alone.
 Every render shown to the builder
@@ -32,7 +35,7 @@ from dotenv import load_dotenv
 from agent.budget import Budget
 from agent.critic import Critic
 from agent.harness import run_task
-from agent.models import AnthropicAdapter, ModelConfig
+from agent.models import ModelConfig, make_adapter, price_known
 from agent.session import Session
 from agent.tools import Tool, control_tools, observe_tools, op_tools
 from agent.tracing import Tracer, TraceRecord
@@ -46,9 +49,9 @@ def main() -> None:
     ap = argparse.ArgumentParser(description="Run the terraform agent on one prompt.")
     ap.add_argument("--prompt", required=True)
     ap.add_argument("--image", type=Path, action="append", default=[], help="reference image (repeatable)")
-    ap.add_argument("--model", default=ModelConfig.model, help="builder model id")
+    ap.add_argument("--model", default=ModelConfig.model, help="builder (and SPEC) model id: claude-... or gemini-...")
     ap.add_argument("--effort", default=ModelConfig.effort, choices=EFFORTS)
-    ap.add_argument("--critic-model", default=None, help="critic model id (default: same as --model)")
+    ap.add_argument("--critic-model", default=None, help="critic (and comparison) model id (default: same as --model)")
     ap.add_argument("--no-critic", action="store_true", help="single pass, no critique rounds")
     ap.add_argument("--rounds", type=int, default=3, help="max build/critique rounds")
     ap.add_argument("--size", type=int, nargs=2, default=(256, 256), metavar=("W", "D"), help="area in blocks")
@@ -71,8 +74,12 @@ def main() -> None:
     out_dir = Path("renders") / tracer.run_id
     observe = [] if args.render == "none" else observe_tools(session, out_dir)
     tools = {t.name: t for t in [*op_tools(session), *control_tools(session), *observe]}
-    model = AnthropicAdapter(ModelConfig(model=args.model, effort=args.effort))
-    critic = None if args.no_critic else Critic(AnthropicAdapter(ModelConfig(model=args.critic_model or args.model, effort=args.effort)))
+    model = make_adapter(ModelConfig(model=args.model, effort=args.effort))
+    critic = None if args.no_critic else Critic(make_adapter(ModelConfig(model=args.critic_model or args.model, effort=args.effort)))
+    for m in sorted({model.config.model, *([] if critic is None else [critic.model.config.model])}):
+        if not price_known(m):
+            print(f"WARNING: no price for {m} in agent/models.py PRICES: costs are reported as unknown and the "
+                  f"cost budget can't be enforced (step and time budgets still apply)")
     images = [p.read_bytes() for p in args.image]
     budget = Budget(max_steps=args.max_steps, max_cost_usd=args.max_cost)
     tracer.log(TraceRecord(run_id=tracer.run_id, stage="run", step=0, note="run header",
@@ -121,6 +128,7 @@ def run_header(args: argparse.Namespace, images: list[bytes], session: Session, 
         "references": [{"path": p.as_posix(), "sha256": hashlib.sha256(b).hexdigest()} for p, b in zip(args.image, images)],
         "builder_model": args.model,
         "critic_model": None if args.no_critic else args.critic_model or args.model,
+        "models": role_models(args),
         "effort": args.effort,
         "max_rounds": args.rounds,
         "compare_both_orders": args.compare_both_orders,
@@ -131,6 +139,16 @@ def run_header(args: argparse.Namespace, images: list[bytes], session: Session, 
         "git": git_state(),
         "tools_sha256": hashlib.sha256(tool_params.encode()).hexdigest(),
     }
+
+
+def role_models(args: argparse.Namespace) -> dict[str, dict[str, str] | None]:
+    """Provider and model per role. SPEC uses the builder's adapter, the blind comparison the critic's."""
+    def entry(model: str) -> dict[str, str]:
+        return {"provider": ModelConfig(model=model).provider, "model": model}
+
+    critic = None if args.no_critic else entry(args.critic_model or args.model)
+    return {"builder": entry(args.model), "spec": None if args.no_spec else entry(args.model),
+            "critic": critic, "comparison": critic}
 
 
 def git_state() -> dict[str, Any] | None:

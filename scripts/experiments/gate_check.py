@@ -49,7 +49,7 @@ def check_pair(critic: Critic, spec: dict, intact: AttemptView, broken: AttemptV
 
 
 def main() -> None:
-    from agent.models import AnthropicAdapter, ModelConfig
+    from agent.models import ModelConfig, make_adapter
     from agent.run import ENV_FILE, make_renderer
     from scripts.demos import build
 
@@ -68,7 +68,7 @@ def main() -> None:
     intact = build("valley")
     broken = broken_copy(intact)
     views = [AttemptView(render(s.state, None), terrain_stats(s.state)) for s in (intact, broken)]
-    critic = Critic(AnthropicAdapter(ModelConfig(model=args.model, effort=args.effort)))
+    critic = Critic(make_adapter(ModelConfig(model=args.model, effort=args.effort)))
     passed, rows = check_pair(critic, SPEC, *views, tracer=tracer)
     for r in rows:
         print(f"Terrain 1 = {r['order']['1']}: winner {r['winner']} ({r['better']}). why: {r['why']}")

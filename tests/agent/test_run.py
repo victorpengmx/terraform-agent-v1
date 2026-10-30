@@ -60,6 +60,15 @@ def test_run_header_without_critic():
     session = Session.flat(16, 16)
     assert run_header(_args(no_critic=True, critic_model="x"), [], session, Budget(), {})["critic_model"] is None
 
+
+def test_run_header_records_provider_and_model_per_role():
+    session = Session.flat(16, 16)
+    models = run_header(_args(critic_model="gemini-3.8-flash"), [], session, Budget(), {})["models"]
+    builder, critic = {"provider": "anthropic", "model": "claude-haiku-5-5"}, {"provider": "gemini", "model": "gemini-3.8-flash"}
+    assert models == {"builder": builder, "spec": builder, "critic": critic, "comparison": critic}
+    models = run_header(_args(no_critic=True, no_spec=True), [], session, Budget(), {})["models"]
+    assert models["spec"] is None and models["critic"] is None and models["comparison"] is None
+
 PNG = b"\x89PNG"
 
 

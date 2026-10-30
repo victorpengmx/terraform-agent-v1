@@ -64,6 +64,15 @@ def test_truncated_tool_call_is_not_executed(session, tmp_path):
     assert block["is_error"] is True and "cut off" in block["content"]
 
 
+def test_malformed_tool_call_is_fed_back_then_two_in_a_row_stop(session, tmp_path):
+    model = ScriptedModel(response(stop="malformed_tool_call"), response(tool_use("raise_peak", PEAK), stop="tool_use"),
+                          response(text("done")))
+    assert run(session, model, tmp_path).stop == "done" and [r.id for r in session.ops] == ["raise_peak_1"]
+    assert "malformed and was not run" in model.calls[1]["messages"][2]["content"]
+    again = ScriptedModel(response(stop="malformed_tool_call"), response(stop="malformed_tool_call"))
+    assert run(Session.flat(33, 33, base_y=64), again, tmp_path).stop == "malformed tool calls: 2 in a row"
+
+
 def test_refusal_ends_the_run(session, tmp_path):
     result = run(session, ScriptedModel(response(stop="refusal")), tmp_path)
     assert result.stop.startswith("refused")
