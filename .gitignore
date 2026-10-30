@@ -22,3 +22,12 @@ textures/
 
 # Local Claude Code settings
 .claude/
+
+# Benchmark reference images with no stated license (sources in eval/benchmark.yaml): download them locally
+eval/references/fjords.jpg
+eval/references/beach1.webp
+eval/references/mesa3.webp
+docs/images/fjords.jpg
+docs/images/beach1.webp
+docs/images/mesa3.webp
+docs/images/mesa2.webp

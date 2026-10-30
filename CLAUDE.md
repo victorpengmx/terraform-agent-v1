@@ -95,7 +95,9 @@ Fill in as they are created.
 - Tests: `pytest`
 - Run agent: `python -m agent.run --prompt "..."`
 - Gemini smoke check (paid): `python -m scripts.experiments.gemini_smoke --model gemini-...`
+- Validate the benchmark (coverage matrix, demo sanity check): `python -m eval.benchmark --demos`
 - Benchmark: `python -m eval.run_eval --suite eval/benchmark.yaml`
+- Eval builds compile into the `TerraformEval` world (flat, top at y=64)
 
 ## Working agreement for sessions
 

@@ -238,6 +238,12 @@ def test_provider_inference_and_factory(monkeypatch):
     assert ModelConfig(model="my-tuned-model", provider="gemini").provider == "gemini"
     with pytest.raises(ValueError, match="infer the provider"):
         ModelConfig(model="gpt-x")
+    import anthropic
+    from google import genai
+
+    # Stub SDK clients: the factory's dispatch is under test; the conftest guard fails real clients.
+    monkeypatch.setattr(anthropic, "Anthropic", lambda: "anthropic client")
+    monkeypatch.setattr(genai, "Client", lambda: "gemini client")
     monkeypatch.setenv("GEMINI_API_KEY", "test-key-not-real")
     monkeypatch.delenv("GOOGLE_API_KEY", raising=False)
     assert isinstance(make_adapter(ModelConfig(model=MODEL)), GeminiAdapter)

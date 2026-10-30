@@ -1,0 +1,266 @@
+# M6 benchmark (DESIGN §16). Validate with `python -m eval.benchmark --demos`.
+#
+# Each graph is the answer key: it is used ONLY to grade builds (eval/match.py match_checklist) and to score
+# the agent's own SPEC (eval/spec_quality.py). It is never given to the agent.
+#
+# Answer-key rules: only what the prompt states or clearly implies; 3-6 features; categories, not numbers;
+# relations only when stated; omitted = unspecified (no check). Text positions use the SPEC viewpoint: the
+# viewer stands at the south edge looking north (left = west, back = north). Image positions are
+# image-relative (image_x, depth). Omitted feature fields default to null / false / "" (eval/benchmark.py).
+#
+# references: paths relative to eval/. tags: the feature types in the graph (checked).
+
+prompts:
+
+- id: t01
+  prompt: "A wide valley between two mountains, the western one taller. A winding river runs down the valley from the north and ends in a lake."
+  tags: [lake, peak, river, valley]
+  spec_ablation: true
+  regression: true
+  graph:
+    features:
+      - {id: mountain_west, type: peak, position: {x: left}}
+      - {id: mountain_east, type: peak, position: {x: right}}
+      - {id: valley_1, type: valley, position: {x: center}}
+      - {id: river_1, type: river, winding: winding}
+      - {id: lake_1, type: lake}
+    relations:
+      - {subject: mountain_west, relation: taller_than, object: mountain_east}
+      - {subject: river_1, relation: reaches, object: lake_1}
+
+- id: t02
+  prompt: "A volcanic island in the sea with a crater lake at the summit."
+  tags: [island, lake, peak, sea]
+  spec_ablation: true
+  regression: false
+  graph:
+    features:
+      - {id: sea_1, type: sea}
+      - {id: island_1, type: island}
+      - {id: volcano, type: peak, part_of: island_1}
+      - {id: crater_lake, type: lake, notes: "in the volcano's summit crater"}
+    relations: []
+
+- id: t03
+  prompt: "Desert mesas with sheer walls, cut by a canyon that runs from the west edge to the east edge, with a creek flowing east along its floor."
+  tags: [canyon, mesa, river]
+  spec_ablation: true
+  regression: true
+  graph:
+    features:
+      - {id: mesa_1, type: mesa, slope: cliff}
+      - {id: mesa_2, type: mesa, slope: cliff}
+      - {id: canyon_1, type: canyon, span_x: full}
+      - {id: creek, type: river}
+    relations:
+      - {subject: creek, relation: reaches, object: east_edge}
+
+- id: t04
+  prompt: "Gentle rolling hills, a meandering river and a low ridge on the horizon."
+  tags: [hills, ridge, river]
+  spec_ablation: true
+  regression: false
+  graph:
+    features:
+      - {id: hills_1, type: hills, slope: gentle}
+      - {id: river_1, type: river, winding: meandering}
+      - {id: ridge_1, type: ridge, position: {y: back}}
+    relations: []
+
+- id: t05
+  prompt: "A jagged mountain range runs across the back of the map from west to east, with its tallest peak near the middle. Lower foothills lie in front of it, and a river flows from the range down to the south edge."
+  tags: [hills, mountain_range, peak, river]
+  spec_ablation: true
+  regression: true
+  graph:
+    features:
+      - {id: range_1, type: mountain_range, position: {y: back}, span_x: full, slope: steep}
+      - {id: summit, type: peak, position: {x: center, y: back}, part_of: range_1, tallest: true}
+      - {id: foothills, type: hills}
+      - {id: river_1, type: river}
+    relations:
+      - {subject: foothills, relation: in_front_of, object: range_1}
+      - {subject: foothills, relation: lower_than, object: range_1}
+      - {subject: river_1, relation: flows_from, object: range_1}
+      - {subject: river_1, relation: reaches, object: south_edge}
+
+- id: t06
+  prompt: "A long knife-edge ridge runs north to south along the west side. East of it, a dead-straight river crosses the map from the north edge to the south edge, and gentle hills fill the east."
+  tags: [hills, ridge, river]
+  spec_ablation: true
+  regression: false
+  graph:
+    features:
+      - {id: ridge_1, type: ridge, position: {x: left}, span_y: wide, slope: steep}
+      - {id: river_1, type: river, span_y: full, winding: almost straight}
+      - {id: hills_1, type: hills, position: {x: right}, slope: gentle}
+    relations:
+      - {subject: river_1, relation: right_of, object: ridge_1}
+      - {subject: river_1, relation: reaches, object: south_edge}
+
+- id: t07
+  prompt: "The sea fills the southern part of the map. Behind it, a flat-topped plateau ends in steep sea cliffs, and a single peak rises at the back on the east side."
+  tags: [peak, plateau, sea]
+  spec_ablation: true
+  regression: false
+  graph:
+    features:
+      - {id: sea_1, type: sea, position: {y: front}}
+      - {id: plateau_1, type: plateau, slope: steep}
+      - {id: peak_1, type: peak, position: {x: right, y: back}}
+    relations:
+      - {subject: plateau_1, relation: behind, object: sea_1}
+      - {subject: peak_1, relation: behind, object: plateau_1}
+
+- id: t08
+  prompt: "A deep, winding canyon with sheer walls cuts across a high plateau that covers the whole map. A thin river at the canyon bottom flows out of the south edge."
+  tags: [canyon, plateau, river]
+  spec_ablation: false
+  regression: false
+  graph:
+    features:
+      - {id: plateau_1, type: plateau, span_x: full, span_y: full}
+      - {id: canyon_1, type: canyon, slope: cliff, winding: winding}
+      - {id: river_1, type: river}
+    relations:
+      - {subject: river_1, relation: reaches, object: south_edge}
+
+- id: t09
+  prompt: "A big lake in the middle, with hills around it and snowy mountains behind. A river runs from the mountains into the lake."
+  tags: [hills, lake, mountain_range, river]
+  spec_ablation: false
+  regression: true
+  graph:
+    features:
+      - {id: lake_1, type: lake, position: {x: center, y: middle}}
+      - {id: hills_1, type: hills}
+      - {id: mountains, type: mountain_range}
+      - {id: river_1, type: river}
+    relations:
+      - {subject: mountains, relation: behind, object: lake_1}
+      - {subject: river_1, relation: flows_from, object: mountains}
+      - {subject: river_1, relation: reaches, object: lake_1}
+    materials: "snow on the mountain tops"
+
+- id: t10
+  prompt: "Twin peaks stand side by side, the left one slightly taller. In front of them, a glacial U-shaped valley, with a straight stream running down its middle to the south edge."
+  tags: [peak, river, valley]
+  spec_ablation: false
+  regression: false
+  graph:
+    features:
+      - {id: peak_left, type: peak}
+      - {id: peak_right, type: peak}
+      - {id: valley_1, type: valley, slope: steep}
+      - {id: stream, type: river, winding: almost straight}
+    relations:
+      - {subject: peak_left, relation: left_of, object: peak_right}
+      - {subject: peak_left, relation: taller_than, object: peak_right}
+      - {subject: valley_1, relation: in_front_of, object: peak_left}
+      - {subject: valley_1, relation: in_front_of, object: peak_right}
+      - {subject: stream, relation: reaches, object: south_edge}
+
+# ---- image prompts: positions are image_x (left .. right) and depth (near / middle / far); span_x is
+# relative to the frame at the feature's depth. Only clearly visible landforms.
+
+- id: i01
+  references: [references/Glacier_park1.jpg]
+  source: "https://commons.wikimedia.org/wiki/File:Glacier_park1.jpg (BorisFromStockdale; found via om.wikipedia.org)"
+  license: "CC BY-SA 3.0 (also GFDL 1.2+)"
+  tags: [hills, mountain_range, peak, valley]
+  spec_ablation: true
+  regression: true
+  graph:
+    features:
+      - {id: peak_left, type: peak, position: {image_x: center-left, depth: middle}, slope: steep}
+      - {id: range_far, type: mountain_range, position: {image_x: center-right, depth: far}}
+      - {id: valley_1, type: valley, position: {image_x: center, depth: middle}}
+      - {id: slope_near, type: hills, position: {image_x: right, depth: near}}
+    relations:
+      - {subject: range_far, relation: behind, object: peak_left}
+    materials: "snow on the high summits, dark rock faces, green grass and conifer slopes below"
+
+- id: i02
+  prompt: "Include the river that flows from the small lake on the left into the fjord."
+  references: [references/fjords.jpg]
+  source: "https://www.offthemap.travel/destinations/norway/fjord-norway/"
+  license: "none stated (all rights reserved assumed); local evaluation use only, do not redistribute"
+  tags: [lake, mountain_range, peak, river, sea]
+  spec_ablation: true
+  regression: false
+  graph:
+    features:
+      - {id: fjord, type: sea, position: {image_x: center-right, depth: middle}}
+      - {id: massif, type: peak, position: {image_x: center-left, depth: middle}, slope: steep}
+      - {id: range_right, type: mountain_range, position: {image_x: right, depth: far}}
+      - {id: lake_left, type: lake, position: {image_x: left, depth: far}}
+      - {id: river_1, type: river}
+    relations:
+      - {subject: range_right, relation: behind, object: fjord}
+      - {subject: river_1, relation: flows_from, object: lake_left}
+      - {subject: river_1, relation: reaches, object: fjord}
+    materials: "snow on the summits, dark forested lower slopes, green fields on the shore lowland"
+    unsupported: [town, cable car]
+
+- id: i03
+  references: [references/beach1.webp]
+  source: "https://24hourslayover.com/krabi-beaches/"
+  license: "none stated (all rights reserved assumed); local evaluation use only, do not redistribute"
+  tags: [ridge, sea]
+  spec_ablation: true
+  regression: false
+  graph:
+    features:
+      - {id: bay, type: sea, position: {image_x: center, depth: middle}}
+      - {id: cliff_left, type: ridge, position: {image_x: left, depth: near}, slope: cliff}
+      - {id: karst_back, type: ridge, position: {image_x: center-right, depth: far}, span_x: wide, slope: cliff}
+      - {id: cliff_right, type: ridge, position: {image_x: right, depth: middle}, slope: cliff}
+    relations:
+      - {subject: karst_back, relation: behind, object: bay}
+      - {subject: cliff_left, relation: left_of, object: bay}
+    materials: "grey and orange limestone cliff faces, a white sand beach along the curved shore, green on the cliff tops"
+    unsupported: [jungle trees, boats, resort buildings]
+
+- id: i04
+  prompt: "Like this, but with a river winding across the desert floor in front of the buttes."
+  references: [references/mesa3.webp]
+  source: "https://www.pinterest.com/pin/desert-mesa-scenic-desert-landscape-with-mountains-and-mesas-ad-scenic-mesa-desert-desert-mesas--1970393574839943/ (a Pinterest pin, likely a stock photo; the original is unknown)"
+  license: "none stated (all rights reserved assumed); local evaluation use only, do not redistribute"
+  tags: [mesa, other, river]
+  spec_ablation: false
+  regression: false
+  graph:
+    features:
+      - {id: butte_left, type: mesa, position: {image_x: left, depth: far}, slope: cliff,
+         notes: "tall, narrow castle-like butte"}
+      - {id: spire, type: other, position: {image_x: center, depth: far}, slope: cliff,
+         notes: "a narrow rock spire on a low ridge between the buttes"}
+      - {id: butte_right, type: mesa, position: {image_x: center-right, depth: far}, slope: cliff,
+         notes: "broad flat-topped butte on a sloping talus base"}
+      - {id: river_1, type: river, winding: winding}
+    relations:
+      - {subject: butte_left, relation: left_of, object: butte_right}
+      - {subject: river_1, relation: in_front_of, object: butte_left}
+      - {subject: river_1, relation: in_front_of, object: butte_right}
+    materials: "red-orange sandstone cliffs over red talus; pale red sand plain with sparse scrub"
+    unsupported: [scrub vegetation]
+
+- id: i05
+  references: [references/mountains.png]
+  source: "own in-game screenshot (Minecraft Java 26.3)"
+  license: "own work"
+  tags: [hills, mountain_range]
+  spec_ablation: false
+  regression: false
+  graph:
+    features:
+      - {id: range_1, type: mountain_range, position: {image_x: center, depth: far}, span_x: full, slope: steep,
+         notes: "many jagged snowy summits"}
+      - {id: foothills, type: hills, position: {image_x: center, depth: middle}, slope: moderate}
+      - {id: meadow, type: hills, position: {image_x: center, depth: near}, slope: gentle}
+    relations:
+      - {subject: foothills, relation: in_front_of, object: range_1}
+      - {subject: foothills, relation: lower_than, object: range_1}
+      - {subject: meadow, relation: in_front_of, object: foothills}
+    materials: "snow, grey stone and patches of ice on the peaks; grass with dirt terrace edges on the foothills; grass meadow below"
+    unsupported: [trees, flowers, caves]

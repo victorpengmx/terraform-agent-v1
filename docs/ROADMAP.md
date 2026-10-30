@@ -107,6 +107,9 @@ Design text and images together; build text first, then images on the same forma
 
 - [ ] `eval/benchmark.yaml`: ~15 text + ~5 image prompts, each with a hand-written expected feature graph
       (ground truth for the checks)
+      Scoped to 10 text + 5 image (DESIGN §16). Text entries, validator (`eval/benchmark.py`) and demo sanity
+      check done; image entries i01–i05 drafted with sources. i02–i04 have no stated license: keep them out of
+      the public repo (M7).
 - [x] Tag-independent feature matcher for the eval checks (`eval/match.py`, §16)
 - [ ] `eval/run_eval.py`: one row per run (success, judge score, checklist pass rate, steps, tokens, cost,
       latency, tokens/cost per successful build, model ids, git commit); text and image reported separately
@@ -118,6 +121,9 @@ Design text and images together; build text first, then images on the same forma
 ### M7. Presentable repo
 
 - [ ] Make the repo public; confirm no keys in history
+- [ ] Image licenses: `docs/images/beach1.webp` and `mesa2.webp` (no license, watermarked stock) are untracked
+      but still in pushed history (`3a585e0`): rewrite history or clear them. Find sources for `beach.jpg`,
+      `mesa.jpg`, `snowypeaks.jpg`, `snowypeaks1.png`, `valley.png`, `valley1.jpg`, or drop them
 - [ ] README: what it is, architecture diagram, the LLM/code split in 3 sentences, a text and an image
       example (input → build), before/after images,
       results table, short related work (§17), limitations, next steps

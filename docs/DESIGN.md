@@ -990,6 +990,27 @@ On the 7 saved SPEC runs both modes agree on all 93 checklist items (EVIDENCE 20
 sets differ from the tags by design: tagged modifier and paint ops, and a lake's dug basin, aren't part of
 the landform.
 
+**Benchmark as built** (`eval/benchmark.yaml`, `eval/benchmark.py`, M6 Phase A, 2026-10-31):
+- 15 entries: t01–t10 text, i01–i05 image (`references` relative to `eval/`, with `source` and `license`; two
+  image entries carry a short extra text). Fields: `id`, `prompt`, `references`, `source`, `license`, `tags`
+  (= the graph's feature types, checked), `spec_ablation` (exactly t01–t07 and i01–i03), `regression` (5), and
+  `graph`, the answer key in the SPEC schema (§9.3). Feature fields left out of the YAML are filled with their
+  unspecified value before strict validation, so a mistyped key is still an error.
+- **Answer-key rules:** only what the prompt states or clearly implies; 3–6 features; categories, never
+  numbers; relations only when stated; anything unspecified is left out (no check). The answer key is used
+  only for grading and SPEC-quality scoring; the agent never sees it and writes its own SPEC (or none).
+- **Validation:** `python -m eval.benchmark` checks ids, references, counts, `FeatureGraph.problems()`,
+  position forms (x/y for text, image_x/depth for images) and tags, and prints a coverage matrix (feature
+  types, with rivers split by winding, and relations × prompts). `--demos` grades the hand-scripted demos
+  against the prompts they fit (valley → t01, island → t02, mesa → t03) with `match_checklist`: a good demo
+  failing a major item means the answer key is stricter than the prompt. A test keeps this true.
+- **Reference images** without a redistribution license (i02–i04) are gitignored; the YAML keeps each one's
+  source URL, the validator says where to download a missing one, and the tests only warn about it.
+- **Builds** compile into the `TerraformEval` world (flat, top at y=64, creative, peaceful, no structures;
+  TerraformTest's generator settings).
+- pytest never reaches an API: `tests/conftest.py` removes the key variables and fails any test that reads
+  `.env` or constructs a real SDK client.
+
 **[Later]**
 - 30–50 prompts, more references, some sketches.
 - Human calibration: ~40 ratings incl. "faithful but ugly" and "pretty but loose" cases; judge–human
