@@ -27,6 +27,7 @@ import json
 import subprocess
 import sys
 import zlib
+from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Callable
 
@@ -34,8 +35,8 @@ from dotenv import load_dotenv
 
 from agent.budget import Budget
 from agent.critic import Critic
-from agent.harness import run_task
-from agent.models import ModelConfig, make_adapter, price_known
+from agent.harness import RunResult, run_task
+from agent.models import ModelAdapter, ModelConfig, make_adapter, price_known
 from agent.session import Session
 from agent.tools import Tool, control_tools, observe_tools, op_tools
 from agent.tracing import Tracer, TraceRecord
@@ -69,39 +70,67 @@ def main() -> None:
     load_dotenv(ENV_FILE, override=False)
     sys.stdout.reconfigure(encoding="utf-8", errors="replace")  # model text (e.g. "≈") on a cp1252 Windows console
 
+    cfg = RunConfig(prompt=args.prompt, images=tuple(args.image), model=args.model, effort=args.effort,
+                    critic=not args.no_critic, critic_model=args.critic_model, rounds=args.rounds, size=tuple(args.size),
+                    base_y=args.base_y, seed=args.seed, budget=Budget(max_steps=args.max_steps, max_cost_usd=args.max_cost),
+                    render=args.render, use_spec=not args.no_spec, compare_both_orders=args.compare_both_orders)
     tracer = Tracer()
-    session = Session.flat(*args.size, base_y=args.base_y, seed=run_seed(args.seed, tracer.run_id))
-    out_dir = Path("renders") / tracer.run_id
-    observe = [] if args.render == "none" else observe_tools(session, out_dir)
+    print(execute(cfg, tracer, Path("renders") / tracer.run_id))
+
+
+@dataclass(frozen=True)
+class RunConfig:
+    """One run's configuration: what `main` builds from the command line and the eval runner from a config."""
+
+    prompt: str
+    images: tuple[Path, ...] = ()  # reference image paths
+    model: str = ModelConfig.model  # builder (and SPEC)
+    effort: str | None = ModelConfig.effort
+    critic: bool = True
+    critic_model: str | None = None  # critic and comparison; None = the builder's model
+    rounds: int = 3
+    size: tuple[int, int] = (256, 256)
+    base_y: float = 64.0
+    seed: int | None = None  # None: derived from the run id (run_seed)
+    budget: Budget = field(default_factory=Budget)
+    render: str = "l2"  # l1 | l2 | none
+    use_spec: bool = True
+    compare_both_orders: bool = False
+
+
+def execute(cfg: RunConfig, tracer: Tracer, out_dir: Path,
+            make_model: Callable[[ModelConfig], ModelAdapter] = make_adapter) -> RunResult:
+    """One run, in-process: session, tools, adapters, trace header and the harness; the final op stack and
+    renders go to `out_dir` (also on a budget stop or a crash). `make_model` builds each role's adapter."""
+    session = Session.flat(*cfg.size, base_y=cfg.base_y, seed=run_seed(cfg.seed, tracer.run_id))
+    observe = [] if cfg.render == "none" else observe_tools(session, out_dir)
     tools = {t.name: t for t in [*op_tools(session), *control_tools(session), *observe]}
-    model = make_adapter(ModelConfig(model=args.model, effort=args.effort))
-    critic = None if args.no_critic else Critic(make_adapter(ModelConfig(model=args.critic_model or args.model, effort=args.effort)))
+    model = make_model(ModelConfig(model=cfg.model, effort=cfg.effort))
+    critic = Critic(make_model(ModelConfig(model=cfg.critic_model or cfg.model, effort=cfg.effort))) if cfg.critic else None
     for m in sorted({model.config.model, *([] if critic is None else [critic.model.config.model])}):
         if not price_known(m):
             print(f"WARNING: no price for {m} in agent/models.py PRICES: costs are reported as unknown and the "
                   f"cost budget can't be enforced (step and time budgets still apply)")
-    images = [p.read_bytes() for p in args.image]
-    budget = Budget(max_steps=args.max_steps, max_cost_usd=args.max_cost)
+    images = [Path(p).read_bytes() for p in cfg.images]
     tracer.log(TraceRecord(run_id=tracer.run_id, stage="run", step=0, note="run header",
-                           header=run_header(args, images, session, budget, tools)))
+                           header=run_header(cfg, images, session, cfg.budget, tools)))
 
-    print(f"run {tracer.run_id}: builder={args.model} critic={'off' if critic is None else critic.model.config.model} trace={tracer.path}")
+    print(f"run {tracer.run_id}: builder={cfg.model} critic={'off' if critic is None else critic.model.config.model} trace={tracer.path}")
     try:
-        result = run_task(
-            prompt=args.prompt,
+        return run_task(
+            prompt=cfg.prompt,
             images=images,
             session=session,
             tools=tools,
             model=model,
             tracer=tracer,
-            budget=budget,
+            budget=cfg.budget,
             critic=critic,
-            render=None if args.render == "none" else make_renderer(args.render, out_dir, view=l2_view(images)),
-            max_rounds=args.rounds,
-            compare_both_orders=args.compare_both_orders,
-            use_spec=not args.no_spec,
+            render=None if cfg.render == "none" else make_renderer(cfg.render, out_dir, view=l2_view(images)),
+            max_rounds=cfg.rounds,
+            compare_both_orders=cfg.compare_both_orders,
+            use_spec=cfg.use_spec,
         )
-        print(result)
     finally:
         # The harness leaves the session on the latest accepted attempt, so this is the run's final terrain.
         views = ("overview_ne", "overview_sw", *(["overview_s"] if images else []))
@@ -115,7 +144,7 @@ def run_seed(seed: int | None, run_id: str) -> int:
     return seed if seed is not None else zlib.crc32(run_id.encode()) & 0x7FFFFFFF
 
 
-def run_header(args: argparse.Namespace, images: list[bytes], session: Session, budget: Budget, tools: dict[str, Tool]) -> dict[str, Any]:
+def run_header(cfg: RunConfig, images: list[bytes], session: Session, budget: Budget, tools: dict[str, Tool]) -> dict[str, Any]:
     """What a run was asked and how it was configured: the trace's step-0 record.
 
     Reference images are recorded by path and sha256 (not embedded). `tools_sha256` hashes the tool list as
@@ -124,16 +153,16 @@ def run_header(args: argparse.Namespace, images: list[bytes], session: Session, 
     base = session.stack.base
     tool_params = json.dumps([t.to_param() for t in tools.values()], sort_keys=True)
     return {
-        "prompt": args.prompt,
-        "references": [{"path": p.as_posix(), "sha256": hashlib.sha256(b).hexdigest()} for p, b in zip(args.image, images)],
-        "builder_model": args.model,
-        "critic_model": None if args.no_critic else args.critic_model or args.model,
-        "models": role_models(args),
-        "effort": args.effort,
-        "max_rounds": args.rounds,
-        "compare_both_orders": args.compare_both_orders,
-        "spec": "none" if args.no_spec else "model",
-        "render": args.render,
+        "prompt": cfg.prompt,
+        "references": [{"path": Path(p).as_posix(), "sha256": hashlib.sha256(b).hexdigest()} for p, b in zip(cfg.images, images)],
+        "builder_model": cfg.model,
+        "critic_model": (cfg.critic_model or cfg.model) if cfg.critic else None,
+        "models": role_models(cfg),
+        "effort": cfg.effort,
+        "max_rounds": cfg.rounds,
+        "compare_both_orders": cfg.compare_both_orders,
+        "spec": "model" if cfg.use_spec else "none",
+        "render": cfg.render,
         "budget": {"max_steps": budget.max_steps, "max_cost_usd": budget.max_cost_usd, "max_seconds": budget.max_seconds},
         "canvas": {"width": base.width, "depth": base.depth, "base_y": base.base_y, "seed": base.seed},
         "git": git_state(),
@@ -141,13 +170,13 @@ def run_header(args: argparse.Namespace, images: list[bytes], session: Session, 
     }
 
 
-def role_models(args: argparse.Namespace) -> dict[str, dict[str, str] | None]:
+def role_models(cfg: RunConfig) -> dict[str, dict[str, str] | None]:
     """Provider and model per role. SPEC uses the builder's adapter, the blind comparison the critic's."""
     def entry(model: str) -> dict[str, str]:
         return {"provider": ModelConfig(model=model).provider, "model": model}
 
-    critic = None if args.no_critic else entry(args.critic_model or args.model)
-    return {"builder": entry(args.model), "spec": None if args.no_spec else entry(args.model),
+    critic = entry(cfg.critic_model or cfg.model) if cfg.critic else None
+    return {"builder": entry(cfg.model), "spec": entry(cfg.model) if cfg.use_spec else None,
             "critic": critic, "comparison": critic}
 
 

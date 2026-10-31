@@ -113,10 +113,15 @@ Design text and images together; build text first, then images on the same forma
 - [x] Tag-independent feature matcher for the eval checks (`eval/match.py`, §16)
 - [ ] `eval/run_eval.py`: one row per run (success, judge score, checklist pass rate, steps, tokens, cost,
       latency, tokens/cost per successful build, model ids, git commit); text and image reported separately
+      Code done and offline-tested (configs, resumable runner, cost gate, rescore; DESIGN §16); pilot pending.
 - [ ] SPEC quality: agent graph vs. hand-written graph (features found, categories, relations)
+      Code done (`eval/spec_quality.py`); needs real runs.
 - [ ] Eval judge with a prompt separate from the critic
+      Code done (`eval/judge.py`, `eval/prompts.py`, cached); not yet run live; calibration (E3) after the runs.
 - [ ] Ablations: critic on vs. off; SPEC on vs. off (2 seeds if budget allows)
+      Configs `e1_critic` (60 runs, ≤ $37.71) and `e2_spec` (20 runs, ≤ $20.07) ready.
 - [ ] Report in `eval/reports/` with a results table and honest limitations
+      Code done (`eval/report.py`); sample from fake data in `eval/reports/2026-10-31-SAMPLE-fake-data.md`.
 
 ### M7. Presentable repo
 

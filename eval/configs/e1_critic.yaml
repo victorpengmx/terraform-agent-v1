@@ -1,0 +1,13 @@
+# E1: critic on vs off. All 15 prompts x seeds 1, 2 x 2 conditions = 60 runs.
+name: e1_critic
+prompts: all
+seeds: [1, 2]
+models: {builder: claude-haiku-5-5, critic: claude-opus-5-5, judge: null}  # null judge: gemini-3.1-flash-lite if installed, else claude-opus-5-5
+effort: high
+render: l2
+size: [256, 256]
+compare_both_orders: true
+budget: {max_steps: 40, max_cost_usd: 1.00, max_seconds: 900}
+conditions:
+  critic_on: {critic: true, rounds: 3, use_spec: true}
+  critic_off: {critic: false, use_spec: true, budget: {max_cost_usd: 0.25}}

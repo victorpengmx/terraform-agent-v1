@@ -1,0 +1,13 @@
+# E2: SPEC on vs off. The 10 spec_ablation prompts x seeds 1, 2 with SPEC off = 20 runs; the SPEC-on side is
+# e1_critic's critic_on runs (same prompts, seeds and settings), paired in the report.
+name: e2_spec
+prompts: spec_ablation
+seeds: [1, 2]
+models: {builder: claude-haiku-5-5, critic: claude-opus-5-5, judge: null}
+effort: high
+render: l2
+size: [256, 256]
+compare_both_orders: true
+budget: {max_steps: 40, max_cost_usd: 1.00, max_seconds: 900}
+conditions:
+  spec_off: {critic: true, rounds: 3, use_spec: false}

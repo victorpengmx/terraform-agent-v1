@@ -1011,6 +1011,53 @@ the landform.
 - pytest never reaches an API: `tests/conftest.py` removes the key variables and fails any test that reads
   `.env` or constructs a real SDK client.
 
+**Evaluation code as built** (M6 Phase B, 2026-10-31; all offline-tested with fake adapters):
+- **Experiments are configs** (`eval/configs/*.yaml`, `eval/config.py`): prompts, seeds, models per role,
+  effort, render level, area, `compare_both_orders` (on for eval runs), per-run budget with per-condition
+  overrides, and named conditions (critic on/off, rounds, use_spec). E1 `e1_critic` (15 × seeds 1, 2 ×
+  critic_on/critic_off = 60 runs), E2 `e2_spec` (the 10 spec_ablation prompts × 2 seeds × spec_off = 20, paired
+  with E1's critic_on), `opus` (optional), `pilot` (t01, i01 × seed 1 × both = 4), `regression`. Defaults:
+  builder Haiku 5.5, critic Opus 5.5, judge `gemini-3.1-flash-lite` when the gemini extra is installed (else
+  Opus, marked `judge_same_family`).
+- **Runner** (`eval/run_eval.py`): calls `agent.run.execute` in-process (the CLI's wiring, now shared through
+  `RunConfig`) with the config's seed as canvas seed, so (prompt, seed) pairs match across conditions. The
+  agent never gets the answer key: it writes its own SPEC or none; a test checks that no answer-key id reaches
+  any model request. Each run's trace, final stack and renders go to `eval/results/<id>/<key>/`, one row per
+  run to `runs.jsonl` (last row per key wins). Re-running skips finished runs and retries errored ones.
+- **Cost gate:** every paid command (run_eval, rescore --judge, regression) prints its estimate first (pending
+  runs × their budget cap, plus judge calls × a per-call token estimate at the judge's price) and spends only
+  with `--yes`. E1 is capped at $37.71 (critic_on $1.00, critic_off $0.25 per run), E2 at $20.07; from the
+  token counts of past critic calls an Opus-critic run should cost about $0.60 and a critic_off run $0.03.
+- **Success** (`eval/scoring.py`) = no failed major answer-key item (matcher mode) AND no failed blocking or
+  major programmatic check AND judge pass. Each part is stored; with no usable judge verdict overall success
+  is unknown (left out of rates, counted in the report), never a failure. The checklist pass rate (passed /
+  all items, skipped = not passed) is the continuous score.
+- **Eval judge** (`eval/judge.py`, prompt in `eval/prompts.py`): looks only: reasons first, then naturalism,
+  minecraft_quality, materials, reference_match (1–5, null without references), verdict. Pass = verdict
+  pass and every score ≥ 3, enforced in code. Sees the request, references and neutral-title L2 renders
+  compiled from the final stack (overview_sw, overview_ne; image prompts add overview_s after the
+  reference): no op list, graph, statistics or condition. Scores out of range are retried once. Verdicts are
+  cached by (stack hash, judge-prompt hash, judge model); failures are not cached.
+- **Re-scoring** (`eval/rescore.py`) recomputes checklist, checks and success from saved stacks (and,
+  with `--judge`, the judge, cache first) and rewrites `runs.jsonl` atomically with a `.bak`.
+- **SPEC quality** (E5, `eval/spec_quality.py`): agent graph vs answer key, one-to-one on compatible type
+  and overlapping position bands; feature recall and precision, category accuracy (exact and ±1) on matched
+  features, relation recall (inverse relations count); text and image separately.
+- **Statistics** (`eval/stats.py`): runs pair by (prompt, seed). Exact two-sided sign test (ties dropped)
+  and a 95% bootstrap CI of the paired difference that resamples prompts (each prompt's seeds averaged
+  first; 10 000 samples, fixed seed). Verdicts in plain words: "no clear difference at this N" when the CI
+  includes 0, and none at all below 5 prompts, where the CI collapses onto the few values there are.
+- **Report** (`eval/report.py`): E1, E2 (all, text, image; per-prompt table), E4 (cost and tokens per
+  successful build, p50/p95 latency, calls, tool-error rate, critic fix validity, rollback rate, revision and
+  Terrain 1 win rates), E5, E3 when scored, and limitations computed from the rows; plus a runs CSV.
+- **Judge calibration** (E3, `eval/calibrate.py`): a seeded sample of ~30 judged runs stratified by verdict ×
+  kind × condition, as a blind rating sheet (condition, verdict and run paths hidden; stacks copied under
+  item names); 8 items are rated from in-game screenshots of TerraformEval. Scoring: Spearman (human mean
+  vs judge mean), pass/fail agreement, Cohen's κ and the confusion matrix, for render- and screenshot-rated
+  items separately.
+- **Regression** (E7, `eval/regression.py`): the 5 regression prompts × seed 1 × critic_on against
+  `eval/baselines/regression.json`; flags success true → false and pass-rate drops > 0.10, warns on cost +50%.
+
 **[Later]**
 - 30–50 prompts, more references, some sketches.
 - Human calibration: ~40 ratings incl. "faithful but ugly" and "pretty but loose" cases; judge–human

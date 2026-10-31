@@ -1,0 +1,12 @@
+# E7 regression: the 5 regression prompts x seed 1 x critic_on, fixed settings (eval/regression.py).
+name: regression
+prompts: regression
+seeds: [1]
+models: {builder: claude-haiku-5-5, critic: claude-opus-5-5, judge: null}
+effort: high
+render: l2
+size: [256, 256]
+compare_both_orders: true
+budget: {max_steps: 40, max_cost_usd: 1.00, max_seconds: 900}
+conditions:
+  critic_on: {critic: true, rounds: 3, use_spec: true}

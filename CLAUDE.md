@@ -96,7 +96,13 @@ Fill in as they are created.
 - Run agent: `python -m agent.run --prompt "..."`
 - Gemini smoke check (paid): `python -m scripts.experiments.gemini_smoke --model gemini-...`
 - Validate the benchmark (coverage matrix, demo sanity check): `python -m eval.benchmark --demos`
-- Benchmark: `python -m eval.run_eval --suite eval/benchmark.yaml`
+- Benchmark (paid; prints the cost estimate, spends only with `--yes`; resumes):
+  `python -m eval.run_eval --config eval/configs/e1_critic.yaml [--dry-run] [--yes]`
+- Re-score saved runs (free; `--judge` re-judges, uncached calls need `--yes`): `python -m eval.rescore eval/results/<id>`
+- Report: `python -m eval.report eval/results/e1_critic eval/results/e2_spec --name <name> [--calibration <name>]`
+- Judge calibration: `python -m eval.calibrate sample eval/results/e1_critic --name <name>`, then
+  `python -m eval.calibrate score <name>`
+- Regression (paid): `python -m eval.regression [--yes] [--update-baseline]`
 - Eval builds compile into the `TerraformEval` world (flat, top at y=64)
 
 ## Working agreement for sessions

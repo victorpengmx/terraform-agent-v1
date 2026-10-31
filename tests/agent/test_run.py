@@ -1,6 +1,5 @@
 """agent.run output: the trace header, final op stack and renders a run leaves behind (no network)."""
 
-import argparse
 import base64
 import hashlib
 import json
@@ -12,7 +11,7 @@ import pytest
 from agent.budget import Budget
 from agent.critic import Critic
 from agent.harness import run_task
-from agent.run import l2_view, make_renderer, run_header, run_seed, save_final
+from agent.run import RunConfig, l2_view, make_renderer, run_header, run_seed, save_final
 from agent.session import Session
 from agent.tools import control_tools, op_tools
 from agent.tracing import Tracer, TraceRecord
@@ -21,16 +20,15 @@ from terrain.opstack import OpStack
 
 
 def _args(**kw):
-    defaults = dict(prompt="a lone volcanic peak", image=[], model="claude-haiku-5-5", effort="low", critic_model=None,
-                    no_critic=False, rounds=2, render="l1", compare_both_orders=False, no_spec=False)
-    return argparse.Namespace(**{**defaults, **kw})
+    defaults = dict(prompt="a lone volcanic peak", model="claude-haiku-5-5", effort="low", rounds=2, render="l1")
+    return RunConfig(**{**defaults, **kw})
 
 
 def test_run_header_records_prompt_references_and_config(tmp_path):
     session = Session.flat(64, 48, base_y=70, seed=5)
     tools = {t.name: t for t in [*op_tools(session), *control_tools(session)]}
     ref = b"\x89PNG fake reference"
-    header = run_header(_args(image=[Path("refs/peak.png")]), [ref], session, Budget(max_steps=10), tools)
+    header = run_header(_args(images=(Path("refs/peak.png"),)), [ref], session, Budget(max_steps=10), tools)
 
     assert header["prompt"] == "a lone volcanic peak"
     assert header["references"] == [{"path": "refs/peak.png", "sha256": hashlib.sha256(ref).hexdigest()}]
@@ -58,7 +56,7 @@ def test_run_seed_comes_from_the_flag_or_the_run_id():
 
 def test_run_header_without_critic():
     session = Session.flat(16, 16)
-    assert run_header(_args(no_critic=True, critic_model="x"), [], session, Budget(), {})["critic_model"] is None
+    assert run_header(_args(critic=False, critic_model="x"), [], session, Budget(), {})["critic_model"] is None
 
 
 def test_run_header_records_provider_and_model_per_role():
@@ -66,7 +64,7 @@ def test_run_header_records_provider_and_model_per_role():
     models = run_header(_args(critic_model="gemini-3.8-flash"), [], session, Budget(), {})["models"]
     builder, critic = {"provider": "anthropic", "model": "claude-haiku-5-5"}, {"provider": "gemini", "model": "gemini-3.8-flash"}
     assert models == {"builder": builder, "spec": builder, "critic": critic, "comparison": critic}
-    models = run_header(_args(no_critic=True, no_spec=True), [], session, Budget(), {})["models"]
+    models = run_header(_args(critic=False, use_spec=False), [], session, Budget(), {})["models"]
     assert models["spec"] is None and models["critic"] is None and models["comparison"] is None
 
 PNG = b"\x89PNG"

@@ -1,0 +1,12 @@
+# Optional: Opus as the builder. 15 prompts x seed 1 x critic_on = 15 runs.
+name: opus
+prompts: all
+seeds: [1]
+models: {builder: claude-opus-5-5, critic: claude-opus-5-5, judge: null}
+effort: high
+render: l2
+size: [256, 256]
+compare_both_orders: true
+budget: {max_steps: 40, max_cost_usd: 3.00, max_seconds: 1800}
+conditions:
+  critic_on: {critic: true, rounds: 3, use_spec: true}

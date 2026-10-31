@@ -31,3 +31,9 @@ docs/images/fjords.jpg
 docs/images/beach1.webp
 docs/images/mesa3.webp
 docs/images/mesa2.webp
+
+# Eval run outputs (traces, stacks, renders) and the judge cache; reports, configs and baselines are committed
+eval/results/
+eval/cache/
+eval/calibration/*/images/
+eval/calibration/*/stacks/

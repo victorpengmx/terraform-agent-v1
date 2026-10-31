@@ -31,6 +31,8 @@ PRICES: dict[str, dict[str, float | None]] = {
     "gemini-3.8-flash": {"input": None, "output": None, "cache_read": None},
     "gemini-3.6-flash": {"input": None, "output": None, "cache_read": None},
     "gemini-3.1-pro-preview": {"input": None, "output": None, "cache_read": None},
+    # Standard tier, from https://ai.google.dev/gemini-api/docs/pricing (2026-10-31); the M6 eval judge.
+    "gemini-3.1-flash-lite": {"input": 0.25, "output": 1.50, "cache_read": 0.025},
 }
 CACHE_WRITE_MULTIPLIER = 1.25  # 5-minute TTL cache writes
 
