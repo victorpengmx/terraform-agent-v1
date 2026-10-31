@@ -37,6 +37,25 @@ PRICES: dict[str, dict[str, float | None]] = {
 }
 CACHE_WRITE_MULTIPLIER = 1.25  # 5-minute TTL cache writes
 
+
+@dataclass(frozen=True)
+class PriceTier:
+    """A long-prompt tier: a request whose prompt (input + cache read + cache write) exceeds `threshold` tokens
+    is billed at `rates` on every line item (cache writes at the tier's input rate x CACHE_WRITE_MULTIPLIER)."""
+
+    threshold: int
+    rates: dict[str, float | None]
+
+
+PRICE_TIERS: dict[str, PriceTier] = {
+    # Haiku 5.5 above 100K prompt tokens: 5x on input, output, cache read and cache write.
+    # TODO(victor): confirm against the Anthropic price list.
+    "claude-haiku-5-5": PriceTier(100_000, {"input": 0.50, "output": 2.50, "cache_read": 0.05}),
+}
+
+ROTATION_TOKENS = 150_000  # default episode-rotation threshold (prompt tokens of the last call, DESIGN §13)
+TIER_ROTATION_MARGIN = 10_000  # with a long-prompt tier: rotate this far below its threshold
+
 # Models that accept the server-side refusal fallback (`fallbacks="default"`).
 FALLBACK_MODELS = {"claude-opus-5-5", "claude-opus-5", "claude-fable-5-1", "claude-sonnet-5-5"}
 
@@ -72,11 +91,17 @@ class Usage:
     cache_read_tokens: int = 0
     cache_write_tokens: int = 0
 
+    @property
+    def prompt_tokens(self) -> int:
+        return self.input_tokens + self.cache_read_tokens + self.cache_write_tokens
+
     def cost_usd(self, model: str) -> float | None:
-        """None when the model or one of its prices is unknown (reported as "unknown", never as $0)."""
+        """Cost of ONE request (a long-prompt tier depends on that request's prompt size, so never call this on
+        summed usage). None when the model or one of its prices is unknown (reported as "unknown", never $0)."""
         if not price_known(model):
             return None
-        p = PRICES[model]
+        tier = PRICE_TIERS.get(model)
+        p = tier.rates if tier is not None and self.prompt_tokens > tier.threshold else PRICES[model]
         return (
             self.input_tokens * p["input"]
             + self.output_tokens * p["output"]
@@ -87,7 +112,16 @@ class Usage:
 
 def price_known(model: str) -> bool:
     p = PRICES.get(model)
-    return p is not None and all(v is not None for v in p.values())
+    tier = PRICE_TIERS.get(model)
+    return (p is not None and all(v is not None for v in p.values())
+            and (tier is None or all(v is not None for v in tier.rates.values())))
+
+
+def rotation_threshold(model: str) -> int:
+    """Prompt tokens at which a builder episode rotates: below a long-prompt tier when the model has one, so a
+    long episode doesn't tip every later call into the higher rates."""
+    tier = PRICE_TIERS.get(model)
+    return tier.threshold - TIER_ROTATION_MARGIN if tier is not None else ROTATION_TOKENS
 
 
 @dataclass

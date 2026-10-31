@@ -6,6 +6,7 @@ import pytest
 from agent.budget import Budget
 from agent.critic import Critic
 from agent.harness import comparison_order, run_task
+from agent.models import ModelConfig
 from agent.session import Session
 from agent.tools import control_tools, observe_tools, op_tools
 from agent.tracing import Tracer
@@ -113,6 +114,16 @@ def test_episode_rotates_when_context_is_long(session, tmp_path):
     run(session, model, tmp_path)
     fresh = model.calls[1]["messages"]
     assert len(fresh) == 1 and "continues earlier work" in fresh[0]["content"][-1]["text"]
+
+
+@pytest.mark.parametrize("model_id, rotates", [("claude-haiku-5-5", True), ("claude-opus-5-5", False)])
+def test_rotation_stays_below_a_long_prompt_tier(session, tmp_path, model_id, rotates):
+    """Haiku has a 100K long-prompt tier, so its episodes rotate at 90K prompt tokens; Opus keeps 150K."""
+    model = ScriptedModel(response(tool_use("raise_peak", PEAK), stop="tool_use", input_tokens=95_000), response(text("done")))
+    model.config = ModelConfig(model=model_id)
+    run(session, model, tmp_path)
+    assert (len(model.calls[1]["messages"]) == 1) is rotates
+    assert ("episode rotated" in (tmp_path / "t.jsonl").read_text()) is rotates
 
 
 def test_a_rotated_episode_keeps_the_rounds_critique_and_rollback_feedback(session, tmp_path):

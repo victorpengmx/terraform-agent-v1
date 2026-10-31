@@ -147,6 +147,36 @@ def test_usage_cost():
     assert Usage(1).cost_usd("unknown-model") is None
 
 
+def test_a_long_prompt_tier_prices_every_line_item_of_that_request():
+    # Haiku 5.5 base: input 0.10, output 0.50, cache read 0.01, cache write 0.10 x 1.25 per 1M.
+    at_threshold = Usage(input_tokens=40_000, output_tokens=2_000, cache_read_tokens=50_000, cache_write_tokens=10_000)
+    assert at_threshold.prompt_tokens == 100_000  # not above it: base rates
+    assert at_threshold.cost_usd("claude-haiku-5-5") == pytest.approx((40_000 * 0.10 + 2_000 * 0.50 + 50_000 * 0.01
+                                                                       + 10_000 * 0.125) / 1e6)
+    # One token more and the whole request, output included, is billed at 5x.
+    over = Usage(input_tokens=40_001, output_tokens=2_000, cache_read_tokens=50_000, cache_write_tokens=10_000)
+    assert over.cost_usd("claude-haiku-5-5") == pytest.approx((40_001 * 0.50 + 2_000 * 2.50 + 50_000 * 0.05
+                                                               + 10_000 * 0.625) / 1e6)
+    base = (40_001 * 0.10 + 2_000 * 0.50 + 50_000 * 0.01 + 10_000 * 0.125) / 1e6
+    assert over.cost_usd("claude-haiku-5-5") == pytest.approx(5 * base)
+    # Models without a tier keep one rate set at any size.
+    assert Usage(500_000).cost_usd("claude-opus-5-5") == pytest.approx(2.0)
+
+
+def test_a_tier_with_a_missing_rate_makes_the_price_unknown(monkeypatch):
+    from agent import models
+
+    monkeypatch.setitem(models.PRICE_TIERS, "claude-haiku-5-5", models.PriceTier(100_000, {"input": None, "output": 2.5, "cache_read": 0.05}))
+    assert not models.price_known("claude-haiku-5-5") and Usage(10).cost_usd("claude-haiku-5-5") is None
+
+
+def test_rotation_threshold_is_model_aware():
+    from agent.models import rotation_threshold
+
+    assert rotation_threshold("claude-haiku-5-5") == 90_000  # 10K below its 100K tier
+    assert rotation_threshold("claude-opus-5-5") == rotation_threshold("gemini-3.8-flash") == 150_000
+
+
 def test_budget_trips_on_steps_and_cost():
     t = BudgetTracker(Budget(max_steps=2, max_cost_usd=1.0))
     t.charge(Usage(10, 10), 0.4)

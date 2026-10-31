@@ -25,7 +25,7 @@ from typing import Any, Callable, Literal, TypeVar
 from agent.budget import Budget, BudgetTracker
 from agent.context import ContextManager, Episode, RollbackFeedback
 from agent.critic import AttemptView, Critic, CritiqueResult, spec_checklist
-from agent.models import ModelAdapter, ModelReplyError, ModelResponse
+from agent.models import ModelAdapter, ModelReplyError, ModelResponse, rotation_threshold
 from agent.session import Session, Snapshot, op_diff, terrain_stats
 from agent.spec import FeatureGraph, write_spec
 from agent.tools import Tool, execute, tool_result
@@ -119,7 +119,8 @@ def run_task(
     spec = {"prompt": prompt, "graph": graph if use_spec else None}
     if spec["graph"] is not None:
         session.spec_feature_ids = spec["graph"].ids()
-    context = ContextManager(spec, area=(session.state.width, session.state.depth), references=images)
+    context = ContextManager(spec, area=(session.state.width, session.state.depth), references=images,
+                             max_input_tokens=rotation_threshold(model.config.model))
     tools = {**tools, "write_note": context.note_tool()}
     run.tools, run.tool_params, run.context = tools, [t.to_param() for t in tools.values()], context
     result = RunResult(run_id=tracer.run_id, stop="", rounds=0, session=session, graph=spec["graph"])

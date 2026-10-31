@@ -11,6 +11,7 @@ import json
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Any
 
+from agent.models import ROTATION_TOKENS
 from agent.prompts import BUILDER_SYSTEM
 from agent.session import Session
 from agent.spec import spec_text
@@ -53,7 +54,7 @@ class ContextManager:
         spec: dict[str, Any],
         area: tuple[int, int],
         references: list[bytes] | None = None,
-        max_input_tokens: int = 150_000,
+        max_input_tokens: int = ROTATION_TOKENS,
         max_messages: int = 80,
     ) -> None:
         self.spec = spec  # pinned for the whole run (DESIGN §9.3)
