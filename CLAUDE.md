@@ -56,8 +56,9 @@ design, context management, critique, evaluation), not prompts on top of an API.
 - Builder for real runs: Claude Opus 5.5
 - Critic: same adapter at first; a different model family later
 - Gemini (any role): pass a `gemini-...` id to `--model` / `--critic-model`; the provider is inferred from the
-  prefix and `make_adapter` builds the adapter. Gemini prices in `agent/models.py` are TODO (None): until
-  they're filled in, cost is reported as "unknown" and the cost budget isn't enforced
+  prefix and `make_adapter` builds the adapter. Gemini prices in `agent/models.py`: gemini-3.8-flash,
+  gemini-3.5-flash-lite and gemini-3.1-flash-lite are filled (2026-10-31; gemini-3.8-flash doubles on 2027-01-01);
+  the rest are TODO (None): their cost is reported as "unknown" and the cost budget can't stop them
 - Eval judge: a prompt (later a model) separate from the in-loop critic
 - Eval runs (`eval/configs`): builder `claude-haiku-5-5`, critic `gemini-3.8-flash`, judge `claude-opus-5-5`
   (`opus.yaml`: Opus builder and critic, `gemini-3.8-flash` judge). A config whose judge is its critic is

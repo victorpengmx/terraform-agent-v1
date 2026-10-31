@@ -28,6 +28,7 @@ from agent.tracing import Tracer  # noqa: E402
 from fakes import PEAK  # noqa: E402
 
 MODEL = "gemini-3.8-flash"
+UNPRICED = "gemini-3.6-flash"  # in PRICES without numbers
 SIG = b"\x00opaque-signature\xff"
 
 
@@ -61,9 +62,9 @@ class FakeClient:
         return item
 
 
-def adapter(*replies, **config):
+def adapter(*replies, model=MODEL, **config):
     client = FakeClient(*replies)
-    return GeminiAdapter(ModelConfig(model=MODEL, **config), client=client, sleep=lambda s: None), client
+    return GeminiAdapter(ModelConfig(model=model, **config), client=client, sleep=lambda s: None), client
 
 
 def test_text_reply_usage_and_request_config():
@@ -215,7 +216,7 @@ def test_retries_reach_the_trace(tmp_path):
 
 
 def test_missing_price_is_unknown_not_zero():
-    model, _ = adapter(reply({"text": "hi"}))
+    model, _ = adapter(reply({"text": "hi"}), model=UNPRICED)
     r = model.complete([{"role": "user", "content": "x"}])
     assert r.usage.cost_usd(r.model) is None  # PRICES has the id but no numbers yet
     tracker = BudgetTracker(Budget())
@@ -226,10 +227,18 @@ def test_missing_price_is_unknown_not_zero():
 
 def test_run_result_reports_unknown_cost(tmp_path):
     session = Session.flat(33, 33, base_y=64)
-    model, _ = adapter(reply({"text": "nothing to do"}))
+    model, _ = adapter(reply({"text": "nothing to do"}), model=UNPRICED)
     result = run_task(prompt="a hill", images=[], session=session, tools={}, model=model,
                       tracer=Tracer(run_id="t", root=tmp_path), budget=Budget(), use_spec=False)
     assert result.cost_usd is None and "cost unknown" in str(result)
+
+
+def test_the_eval_critic_is_priced():
+    model, _ = adapter(reply({"text": "hi"}))
+    u = model.complete([{"role": "user", "content": "x"}]).usage
+    # gemini-3.8-flash through 2026-12-31: input 0.75, output (incl. thinking) 3.75, cache read 0.075 per 1M.
+    assert u.cost_usd(MODEL) == pytest.approx((u.input_tokens * 0.75 + u.output_tokens * 3.75 + u.cache_read_tokens * 0.075) / 1e6)
+    assert u.cost_usd(MODEL) > 0
 
 
 def test_provider_inference_and_factory(monkeypatch):

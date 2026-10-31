@@ -119,8 +119,8 @@ Design text and images together; build text first, then images on the same forma
 - [ ] Eval judge with a prompt separate from the critic
       Code done (`eval/judge.py`, `eval/prompts.py`, cached); not yet run live; calibration (E3) after the runs.
 - [ ] Ablations: critic on vs. off; SPEC on vs. off (2 seeds if budget allows)
-      Configs `e1_critic` (60 runs) and `e2_spec` (20 runs) ready; critic_on/spec_off cost shows "unknown" until
-      `gemini-3.8-flash` (the eval critic) is priced. Phase C order: `pilot_haiku`, then `pilot`, then e1, e2.
+      Configs `e1_critic` (60 runs) and `e2_spec` (20 runs) ready, every role priced. Phase C order:
+      `pilot_haiku`, then `pilot`, then e1, e2.
 - [ ] Report in `eval/reports/` with a results table and honest limitations
       Code done (`eval/report.py`); sample from fake data in `eval/reports/2026-10-31-SAMPLE-fake-data.md`.
 

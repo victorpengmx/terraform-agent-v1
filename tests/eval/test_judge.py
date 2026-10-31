@@ -76,4 +76,4 @@ def test_the_judge_sees_request_references_and_neutral_renders_only(tmp_path):
 def test_the_cost_estimate_uses_the_judge_price():
     assert judging.call_estimate("gemini-3.1-flash-lite", 0) > 0
     assert judging.call_estimate("gemini-3.1-flash-lite", 1) > judging.call_estimate("gemini-3.1-flash-lite", 0)
-    assert judging.call_estimate("gemini-3.8-flash", 0) is None  # unpriced: unknown, never $0
+    assert judging.call_estimate("gemini-3.6-flash", 0) is None  # unpriced: unknown, never $0
