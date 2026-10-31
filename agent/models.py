@@ -156,9 +156,12 @@ class ModelAdapter(Protocol):
         system: str | list[dict[str, Any]] | None = None,
         tools: list[dict[str, Any]] | None = None,
         response_schema: dict[str, Any] | None = None,
+        cache_messages: bool = True,
     ) -> ModelResponse:
         """One model call. `response_schema` constrains the reply to JSON matching that schema
-        (no numeric/string-length constraints; every object needs additionalProperties: false)."""
+        (no numeric/string-length constraints; every object needs additionalProperties: false).
+        `cache_messages=False`: cache only the system prompt, for one-shot calls whose messages are never
+        sent again (writing them to the cache would cost 1.25x for nothing)."""
         ...
 
 
@@ -174,11 +177,12 @@ _T = TypeVar("_T", bound=BaseModel)
 
 
 def structured_call(model: ModelAdapter, content: list[dict[str, Any]], system: str, schema: type[_T],
-                    error: type[ModelReplyError] = ModelReplyError) -> tuple[_T, ModelResponse]:
+                    error: type[ModelReplyError] = ModelReplyError, cache_messages: bool = True) -> tuple[_T, ModelResponse]:
     """One strict-JSON call in a fresh context (one user message). Raises `error` (a ModelReplyError
-    subclass, so callers keep their own except clauses), carrying the response so its cost is still charged."""
+    subclass, so callers keep their own except clauses), carrying the response so its cost is still charged.
+    `cache_messages`: see `ModelAdapter.complete`."""
     response = model.complete([{"role": "user", "content": content}], system=system,
-                              response_schema=schema.model_json_schema())
+                              response_schema=schema.model_json_schema(), cache_messages=cache_messages)
     if response.stop_reason != "end_turn":
         raise error(f"stopped with {response.stop_reason!r} (details: {response.stop_details})", response)
     try:
@@ -196,14 +200,11 @@ class AnthropicAdapter:
         if self.client is None:
             self.client = anthropic.Anthropic()  # credentials from ANTHROPIC_API_KEY or `ant auth login`
 
-    def complete(self, messages, *, system=None, tools=None, response_schema=None) -> ModelResponse:
+    def complete(self, messages, *, system=None, tools=None, response_schema=None, cache_messages=True) -> ModelResponse:
         cfg = self.config
-        kwargs: dict[str, Any] = {
-            "model": cfg.model,
-            "max_tokens": cfg.max_tokens,
-            "messages": messages,
-            "cache_control": {"type": "ephemeral"},  # auto-cache the longest stable prefix
-        }
+        kwargs: dict[str, Any] = {"model": cfg.model, "max_tokens": cfg.max_tokens, "messages": messages}
+        if cache_messages:
+            kwargs["cache_control"] = {"type": "ephemeral"}  # auto-cache the longest stable prefix
         if system is not None:
             # Separate breakpoint at the end of tools + system: every new episode and every critic call
             # shares this prefix, but the automatic breakpoint (end of messages) never matches across episodes.

@@ -697,7 +697,9 @@ GPT-4V's referring-expression accuracy on RefCOCOg from 25.7 to 86.4. We control
 
 - Inference-time self-refinement (Self-Refine / Reflexion style); no weights change.
 - **Fresh context:** never sees the builder's conversation. Inputs: spec, references, renders, terrain
-  stats, condensed op list, programmatic check results.
+  stats, condensed op list, programmatic check results. Critique and comparison calls cache only their
+  system prompt (with the tool catalogue): their renders and text are never sent again
+  (`cache_messages=False`; 2026-10-31).
 - **Programmatic checks first** (cheap, objective); blocking failures skip the model call.
 - Rubric 1–5 with level descriptions: prompt_adherence, layout, naturalism, minecraft_quality, materials
   (surface blocks suit each landform and the spec and vary naturally; judged in the 3D render; added in

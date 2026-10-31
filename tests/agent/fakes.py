@@ -50,8 +50,9 @@ class ScriptedModel:
         self.responses = list(responses)
         self.calls: list[dict[str, Any]] = []
 
-    def complete(self, messages, *, system=None, tools=None, response_schema=None) -> ModelResponse:
-        self.calls.append({"messages": [dict(m) for m in messages], "system": system, "tools": tools, "response_schema": response_schema})
+    def complete(self, messages, *, system=None, tools=None, response_schema=None, cache_messages=True) -> ModelResponse:
+        self.calls.append({"messages": [dict(m) for m in messages], "system": system, "tools": tools, "response_schema": response_schema,
+                           "cache_messages": cache_messages})
         if not self.responses:
             raise AssertionError("ScriptedModel ran out of responses")
         return self.responses.pop(0)

@@ -208,7 +208,9 @@ class Critic:
         content.append(text_block("\n\n".join(text)))
         content.extend(image_block(r) for r in renders or [])
 
-        out, response = structured_call(self.model, content, self.system, CritiqueOutput, CriticError)
+        # The renders and text are this call's alone: cache only the system prompt and its tool catalogue.
+        out, response = structured_call(self.model, content, self.system, CritiqueOutput, CriticError,
+                                        cache_messages=False)
         failed_major = any(not c.passed and c.severity == "major" for c in checks)
         failed_major |= any(i.status == "fail" and i.severity == "major" for i in items)
         verdict = "revise" if failed_major else out.verdict
@@ -232,4 +234,5 @@ class Critic:
             content.append(text_block(f"# Terrain {label}\n{view.stats}" + ("\nRenders follow." if view.renders else "")))
             content.extend(image_block(r) for r in view.renders)
         content.append(text_block("Which terrain better fulfils the spec? Answer \"same\" if neither is clearly better."))
-        return structured_call(self.model, content, COMPARE_SYSTEM, CompareOutput, CriticError)
+        # Per-call renders and text are never sent again: cache only the system prompt (DESIGN §11.1).
+        return structured_call(self.model, content, COMPARE_SYSTEM, CompareOutput, CriticError, cache_messages=False)

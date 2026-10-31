@@ -101,7 +101,8 @@ class GeminiAdapter:
                                    "which wins if both are set)")
             self.client = genai.Client()
 
-    def complete(self, messages, *, system=None, tools=None, response_schema=None) -> ModelResponse:
+    def complete(self, messages, *, system=None, tools=None, response_schema=None, cache_messages=True) -> ModelResponse:
+        # cache_messages is ignored: Gemini caches implicitly, with no breakpoints to place or write premium.
         from google.genai import types
 
         cfg = self.config
