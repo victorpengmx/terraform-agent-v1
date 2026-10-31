@@ -59,6 +59,9 @@ design, context management, critique, evaluation), not prompts on top of an API.
   prefix and `make_adapter` builds the adapter. Gemini prices in `agent/models.py` are TODO (None): until
   they're filled in, cost is reported as "unknown" and the cost budget isn't enforced
 - Eval judge: a prompt (later a model) separate from the in-loop critic
+- Eval runs (`eval/configs`): builder `claude-haiku-5-5`, critic `gemini-3.8-flash`, judge `claude-opus-5-5`
+  (`opus.yaml`: Opus builder and critic, `gemini-3.8-flash` judge). A config whose judge is its critic is
+  rejected (only `pilot_haiku`, for pipeline debugging, opts out)
 - Record exact model ids in every eval report.
 
 ## Conventions
