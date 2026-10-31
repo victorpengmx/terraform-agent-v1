@@ -15,10 +15,13 @@ only grades the final stack (eval/scoring.py), and the judge (eval/judge.py) see
 from __future__ import annotations
 
 import argparse
+import contextlib
+import multiprocessing
 import shutil
 import sys
 import time
 import traceback
+from concurrent.futures import ProcessPoolExecutor, as_completed
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Callable
@@ -33,6 +36,7 @@ from eval.rows import append_row, read_rows, trace_stats
 from eval.scoring import answer_key, checks, success
 
 RESULTS = Path("eval/results")
+DEFAULT_WORKERS = 3  # runs at once: most of a run is waiting on model calls (DESIGN §16)
 MakeModel = Callable[[ModelConfig], ModelAdapter]
 
 
@@ -110,10 +114,19 @@ def estimate(config: EvalConfig, runs: list[PlannedRun]) -> tuple[str, float | N
 def run_one(run: PlannedRun, config: EvalConfig, results: Path, suite_dir: Path, make_model: MakeModel,
             judge_model: ModelAdapter | None, cache: Path | None = judging.CACHE,
             render: judging.Renderer = judging.render_views) -> dict[str, Any]:
-    """Build, grade and judge one run; returns its row (status done or error)."""
+    """Build, grade and judge one run; returns its row (status done or error). The run's console output goes to
+    <key>/run.log, so parallel runs don't interleave."""
     run_dir = results / run.key
     if run_dir.exists():
         shutil.rmtree(run_dir)  # a retried run starts clean (traces append)
+    run_dir.mkdir(parents=True)
+    with (run_dir / "run.log").open("w", encoding="utf-8") as log, contextlib.redirect_stdout(log):
+        return _run_one(run, config, results, suite_dir, make_model, judge_model, cache, render)
+
+
+def _run_one(run: PlannedRun, config: EvalConfig, results: Path, suite_dir: Path, make_model: MakeModel,
+             judge_model: ModelAdapter | None, cache: Path | None, render: judging.Renderer) -> dict[str, Any]:
+    run_dir = results / run.key
     cfg = run_config(config, run, suite_dir)
     tracer = Tracer(run_id=f"{results.name}-{run.key}", root=run_dir)
     row: dict[str, Any] = {
@@ -160,22 +173,58 @@ def judge_run(model: ModelAdapter | None, stack, entry: BenchmarkEntry, suite_di
 
 def evaluate(config: EvalConfig, entries: list[BenchmarkEntry], results: Path, suite_dir: Path,
              make_model: MakeModel = make_adapter, cache: Path | None = judging.CACHE,
-             render: judging.Renderer = judging.render_views, log: Callable[[str], None] = print) -> list[dict[str, Any]]:
-    """Run every pending run of `config` and append its row; returns the new rows."""
+             render: judging.Renderer = judging.render_views, log: Callable[[str], None] = print,
+             workers: int = 1) -> list[dict[str, Any]]:
+    """Run every pending run of `config` and append its row as it finishes; returns the new rows.
+
+    workers > 1 runs that many at once in separate processes (spawned: VTK rendering isn't thread-safe), each
+    with its own adapters; `make_model` and `render` must then be picklable (module-level). Rows are appended
+    by this process only, in finishing order."""
     results.mkdir(parents=True, exist_ok=True)
     rows_path = results / "runs.jsonl"
     todo = pending(plan(config, entries), read_rows(rows_path))
-    judge_model = make_model(ModelConfig(model=config.judge_model, effort=config.judge_effort)) if todo else None
-    new = []
-    for k, run in enumerate(todo, 1):
-        log(f"[{k}/{len(todo)}] {run.key}")
-        row = run_one(run, config, results, suite_dir, make_model, judge_model, cache, render)
+    new: list[dict[str, Any]] = []
+
+    def record(k: int, row: dict[str, Any]) -> None:
+        row["workers"] = workers  # latency is measured under this much concurrency
         append_row(rows_path, row)
         new.append(row)
-        s = row.get("success") or {}
-        log(f"  {row['status']}: success {s.get('overall')}, checklist "
-            f"{(row.get('answer_key') or {}).get('passed')}/{(row.get('answer_key') or {}).get('total')}, {row.get('cost_text', row.get('error'))}")
+        s, a = row.get("success") or {}, row.get("answer_key") or {}
+        log(f"[{k}/{len(todo)}] {row['key']} {row['status']}: success {s.get('overall')}, checklist "
+            f"{a.get('passed')}/{a.get('total')}, {row.get('cost_text', row.get('error'))}")
+
+    if workers <= 1 or len(todo) <= 1:
+        judge_model = make_model(ModelConfig(model=config.judge_model, effort=config.judge_effort)) if todo else None
+        for k, run in enumerate(todo, 1):
+            log(f"[{k}/{len(todo)}] {run.key} started")
+            record(k, run_one(run, config, results, suite_dir, make_model, judge_model, cache, render))
+        return new
+    pool = ProcessPoolExecutor(max_workers=min(workers, len(todo)), mp_context=multiprocessing.get_context("spawn"))
+    try:
+        futures = {pool.submit(_run_in_worker, run, config, results, suite_dir, make_model, cache, render): run
+                   for run in todo}
+        log(f"{len(todo)} runs, {min(workers, len(todo))} at a time")
+        for k, fut in enumerate(as_completed(futures), 1):
+            run = futures[fut]
+            try:
+                row = fut.result()
+            except Exception as e:  # noqa: BLE001 - a worker that died: record it so the run is retried
+                row = {"key": run.key, "prompt_id": run.entry.id, "kind": run.entry.kind, "condition": run.condition,
+                       "seed": run.seed, "config": config.name, "status": "error",
+                       "error": f"worker failed: {type(e).__name__}: {e}"}
+            record(k, row)
+    except KeyboardInterrupt:
+        pool.shutdown(wait=False, cancel_futures=True)
+        raise
+    pool.shutdown()
     return new
+
+
+def _run_in_worker(run: PlannedRun, config: EvalConfig, results: Path, suite_dir: Path, make_model: MakeModel,
+                   cache: Path | None, render: judging.Renderer) -> dict[str, Any]:
+    """One run in a worker process, with its own judge adapter."""
+    judge_model = make_model(ModelConfig(model=config.judge_model, effort=config.judge_effort))
+    return run_one(run, config, results, suite_dir, make_model, judge_model, cache, render)
 
 
 def main() -> None:
@@ -185,6 +234,7 @@ def main() -> None:
     ap.add_argument("--results-id", default=None, help="results folder name (default: the config name)")
     ap.add_argument("--dry-run", action="store_true", help="print the plan and cost estimate only")
     ap.add_argument("--yes", action="store_true", help="spend: run the pending runs")
+    ap.add_argument("--workers", type=int, default=DEFAULT_WORKERS, help="runs at once (separate processes)")
     args = ap.parse_args()
     sys.stdout.reconfigure(encoding="utf-8", errors="replace")
     config = load_config(args.config)
@@ -204,7 +254,7 @@ def main() -> None:
     load_dotenv(ENV_FILE, override=False)
     results.mkdir(parents=True, exist_ok=True)
     (results / "config.yaml").write_text(args.config.read_text(encoding="utf-8"), encoding="utf-8")
-    evaluate(config, entries, results, args.suite.parent)
+    evaluate(config, entries, results, args.suite.parent, workers=args.workers)
 
 
 if __name__ == "__main__":

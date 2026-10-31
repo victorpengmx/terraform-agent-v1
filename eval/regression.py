@@ -22,7 +22,7 @@ from agent.run import ENV_FILE, git_state
 from eval.benchmark import SUITE, load
 from eval.config import load_config
 from eval.rows import read_rows
-from eval.run_eval import RESULTS, estimate, evaluate, pending, plan
+from eval.run_eval import DEFAULT_WORKERS, RESULTS, estimate, evaluate, pending, plan
 
 CONFIG = Path("eval/configs/regression.yaml")
 BASELINE = Path("eval/baselines/regression.json")
@@ -73,6 +73,7 @@ def main() -> None:
     ap.add_argument("--compare", type=Path, default=None, help="compare an existing results folder; no runs")
     ap.add_argument("--yes", action="store_true", help="spend: run the regression prompts")
     ap.add_argument("--update-baseline", action="store_true")
+    ap.add_argument("--workers", type=int, default=DEFAULT_WORKERS, help="runs at once (separate processes)")
     args = ap.parse_args()
     sys.stdout.reconfigure(encoding="utf-8", errors="replace")
     results = args.compare
@@ -89,7 +90,7 @@ def main() -> None:
             from dotenv import load_dotenv
 
             load_dotenv(ENV_FILE, override=False)
-            evaluate(config, entries, results, args.suite.parent)
+            evaluate(config, entries, results, args.suite.parent, workers=args.workers)
     current = summary(read_rows(results / "runs.jsonl"))
     if args.update_baseline:
         write_baseline(current, results)

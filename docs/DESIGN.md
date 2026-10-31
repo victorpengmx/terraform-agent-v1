@@ -1035,8 +1035,11 @@ the landform.
 - **Runner** (`eval/run_eval.py`): calls `agent.run.execute` in-process (the CLI's wiring, now shared through
   `RunConfig`) with the config's seed as canvas seed, so (prompt, seed) pairs match across conditions. The
   agent never gets the answer key: it writes its own SPEC or none; a test checks that no answer-key id reaches
-  any model request. Each run's trace, final stack and renders go to `eval/results/<id>/<key>/`, one row per
-  run to `runs.jsonl` (last row per key wins). Re-running skips finished runs and retries errored ones.
+  any model request. Each run's trace, final stack, renders and console log (`run.log`) go to
+  `eval/results/<id>/<key>/`, one row per run to `runs.jsonl` (last row per key wins). Re-running skips
+  finished runs and retries errored ones. `--workers N` (default 3) runs N at once in spawned worker
+  processes (VTK rendering isn't thread-safe), each with its own adapters; only the main process appends
+  rows. Rows record `workers`, since latency is measured under that concurrency.
 - **Cost gate:** every paid command (run_eval, rescore --judge, regression) prints its estimate first (pending
   runs × their budget cap, plus judge calls × a per-call token estimate at the judge's price) and spends only
   with `--yes`. Caps: critic_on $1.00, critic_off $0.25 per run. A condition that uses a model without a

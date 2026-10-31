@@ -150,3 +150,21 @@ def test_pairs_share_prompt_and_seed_across_conditions():
     assert cfgs["t01-critic_on-s2"].seed == cfgs["t01-critic_off-s2"].seed == 2
     assert cfgs["t01-critic_on-s1"].critic and not cfgs["t01-critic_off-s1"].critic
     assert cfgs["t01-critic_off-s1"].budget.max_cost_usd == 1.0  # this test config has no override
+
+
+def test_runs_in_parallel_worker_processes(tmp_path):
+    import os
+
+    from tests.eval import parallel_fakes
+
+    new = run_eval.evaluate(config(seeds=[1, 2]), ENTRIES, tmp_path / "res", run_eval.SUITE.parent,
+                            make_model=parallel_fakes.make_model, cache=None, render=parallel_fakes.render,
+                            log=lambda s: None, workers=2)
+    assert sorted(r["key"] for r in new) == ["t01-critic_off-s1", "t01-critic_off-s2", "t01-critic_on-s1", "t01-critic_on-s2"]
+    assert all(r["status"] == "done" and r["workers"] == 2 for r in new)
+    pids = {r["judge"]["output"]["reasons"][0] for r in new}
+    assert f"pid {os.getpid()}" not in pids  # every run left this process
+    rows = read_rows(tmp_path / "res" / "runs.jsonl")
+    assert len(rows) == 4 and all(r["status"] == "done" for r in rows.values())
+    log = (tmp_path / "res" / "t01-critic_on-s1" / "run.log").read_text(encoding="utf-8")
+    assert "run res-t01-critic_on-s1: builder=claude-haiku-5-5" in log  # the run's prints, not the console

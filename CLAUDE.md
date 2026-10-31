@@ -104,7 +104,7 @@ Fill in as they are created.
 - Recreate the eval experiments (each as its exact commands; paid steps spend only with `--yes`; resumes):
   `python -m eval.reproduce --list`, then e.g. `python -m eval.reproduce pilot_haiku pilot [--yes]` or `all`
 - Benchmark (paid; prints the cost estimate, spends only with `--yes`; resumes):
-  `python -m eval.run_eval --config eval/configs/e1_critic.yaml [--dry-run] [--yes]`
+  `python -m eval.run_eval --config eval/configs/e1_critic.yaml [--dry-run] [--yes] [--workers 3]`
 - Re-score saved runs (free; `--judge` re-judges, uncached calls need `--yes`): `python -m eval.rescore eval/results/<id>`
 - Report: `python -m eval.report eval/results/e1_critic eval/results/e2_spec --name <name> [--calibration <name>]`
 - Judge calibration: `python -m eval.calibrate sample eval/results/e1_critic --name <name>`, then

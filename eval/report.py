@@ -241,8 +241,10 @@ def e4_section(rows: list[dict[str, Any]]) -> list[str]:
     ]
     out = ["## E4: Cost and efficiency", ""]
     out += table(["metric", *(f"`{c}`" for c in conds)], [[m, *(f(effs[c]) for c in conds)] for m, f in metrics])
+    workers = sorted({r.get("workers", 1) for r in done(rows)})
     out += ["", "Tokens include cache reads and writes. Cost per successful build divides all of a condition's agent cost "
-            "by its successes. The revision win rate should stay clearly below 100% and Terrain 1 near 50% (DESIGN §11.4).", ""]
+            "by its successes. The revision win rate should stay clearly below 100% and Terrain 1 near 50% (DESIGN §11.4). "
+            f"Latency is wall time per run with {' or '.join(map(str, workers))} run(s) at a time.", ""]
     return out
 
 
