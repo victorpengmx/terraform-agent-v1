@@ -31,7 +31,7 @@ def main() -> None:
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--model", required=True, help="builder and SPEC model, e.g. a gemini-... id")
     ap.add_argument("--critic-model", default=None, help="critic and comparison model (default: --model)")
-    ap.add_argument("--effort", default="low", choices=EFFORTS)
+    ap.add_argument("--effort", default=None, choices=EFFORTS, help="default: the provider's default effort")
     ap.add_argument("--prompt", default="a lone volcanic peak with a crater lake")
     ap.add_argument("--size", type=int, default=128)
     ap.add_argument("--render", choices=["l1", "l2", "none"], default="l1")

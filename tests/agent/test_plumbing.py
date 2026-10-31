@@ -313,3 +313,9 @@ def test_critique_and_comparison_cache_only_the_system_prompt_and_trace_cache_to
     assert len(judged) == 3
     assert all(r["usage"] == {"input": 900, "output": 300, "cache_read": 6000, "cache_write": 0} for r in judged)
     assert all(r["cost_usd"] == pytest.approx((900 * 0.10 + 300 * 0.50 + 6000 * 0.01) / 1e6) for r in judged)
+
+
+def test_no_effort_is_sent_unless_stated():
+    client, calls = fake_client()
+    AnthropicAdapter(ModelConfig(model="claude-haiku-5-5"), client=client).complete([{"role": "user", "content": "x"}])
+    assert ModelConfig().effort is None and "output_config" not in calls[0]

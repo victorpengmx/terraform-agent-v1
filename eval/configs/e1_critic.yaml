@@ -3,7 +3,6 @@ name: e1_critic
 prompts: all
 seeds: [1, 2]
 models: {builder: claude-haiku-5-5, critic: gemini-3.8-flash, judge: claude-opus-5-5}
-effort: high
 render: l2
 size: [256, 256]
 compare_both_orders: true

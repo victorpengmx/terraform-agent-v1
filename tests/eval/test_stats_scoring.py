@@ -115,3 +115,11 @@ def test_critic_max_tokens_is_set_for_the_gemini_critic_and_capped_for_anthropic
     with pytest.raises(ValueError, match="above 21333, the most the Anthropic SDK allows without streaming"):
         EvalConfig.model_validate(cfg | {"critic_max_tokens": 32_000})
     assert EvalConfig.model_validate(cfg | {"critic_max_tokens": 20_000}).critic_max_tokens == 20_000
+
+
+def test_eval_configs_leave_effort_at_the_provider_default():
+    from pathlib import Path
+
+    for path in Path("eval/configs").glob("*.yaml"):
+        cfg = load_config(path)
+        assert cfg.effort is None and cfg.judge_effort is None, path.name

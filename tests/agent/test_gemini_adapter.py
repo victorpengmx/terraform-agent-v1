@@ -76,9 +76,11 @@ def test_text_reply_usage_and_request_config():
     config = client.calls[0]["config"]
     assert config.system_instruction == "sys" and config.max_output_tokens == 16000
     assert config.automatic_function_calling.disable is True
-    assert config.thinking_config.thinking_level == genai_types.ThinkingLevel.HIGH
-    assert config.thinking_config.include_thoughts is None and config.tools is None
+    assert config.thinking_config is None and config.tools is None  # no effort stated: the model's default thinking
     assert [c.role for c in client.calls[0]["contents"]] == ["user"]
+    model, client = adapter(reply({"text": "hi"}), effort="high")
+    model.complete([{"role": "user", "content": "x"}])
+    assert client.calls[0]["config"].thinking_config.thinking_level == genai_types.ThinkingLevel.HIGH
 
 
 def test_tool_round_trip_through_the_harness(tmp_path):

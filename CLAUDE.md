@@ -53,6 +53,7 @@ design, context management, critique, evaluation), not prompts on top of an API.
 ## Models (DESIGN §9.4)
 
 - Dev/debug runs: Claude Haiku 5.5 (cheap; use it while building plumbing)
+- Effort: unset by default for every model (no effort parameter is sent, so the provider's default applies); set it only when a run states one
 - Builder for real runs: Claude Opus 5.5
 - Critic: same adapter at first; a different model family later
 - Gemini (any role): pass a `gemini-...` id to `--model` / `--critic-model`; the provider is inferred from the

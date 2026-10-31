@@ -93,7 +93,7 @@ def main() -> None:
         from dotenv import load_dotenv
 
         load_dotenv(ENV_FILE, override=False)
-        judge_model = make_adapter(ModelConfig(model=model, effort="low"))
+        judge_model = make_adapter(ModelConfig(model=model))
     new = rescore(rows, entries, args.suite.parent, judge_model)
     write_rows(args.results / "runs.jsonl", new)
     changed = sum((a.get("success") or {}).get("overall") != (b.get("success") or {}).get("overall")

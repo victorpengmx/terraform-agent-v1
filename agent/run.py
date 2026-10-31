@@ -51,7 +51,7 @@ def main() -> None:
     ap.add_argument("--prompt", required=True)
     ap.add_argument("--image", type=Path, action="append", default=[], help="reference image (repeatable)")
     ap.add_argument("--model", default=ModelConfig.model, help="builder (and SPEC) model id: claude-... or gemini-...")
-    ap.add_argument("--effort", default=ModelConfig.effort, choices=EFFORTS)
+    ap.add_argument("--effort", default=None, choices=EFFORTS, help="default: each provider's default effort")
     ap.add_argument("--critic-model", default=None, help="critic (and comparison) model id (default: same as --model)")
     ap.add_argument("--no-critic", action="store_true", help="single pass, no critique rounds")
     ap.add_argument("--rounds", type=int, default=3, help="max build/critique rounds")

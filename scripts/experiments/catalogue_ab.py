@@ -55,7 +55,7 @@ def main() -> None:
 
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--model", default="claude-haiku-5-5")
-    ap.add_argument("--effort", default="high")
+    ap.add_argument("--effort", default=None, help="default: the provider's default effort")
     ap.add_argument("--limit", type=int)
     ap.add_argument("--arms", nargs="+", choices=["without", "with"], default=["without", "with"])
     args = ap.parse_args()

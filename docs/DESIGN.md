@@ -595,7 +595,8 @@ relations (`surrounds`, `between`, `along`).
   - system → `system_instruction`; images → inline data; tools → function declarations;
     `response_schema` → JSON mode with `response_json_schema`.
   - tool_result → function response (`{"output"}` or `{"error"}`; images in `parts`).
-  - Effort maps to `thinking_level` (xhigh and max → high). `thinking_display="summarized"` →
+  - Effort maps to `thinking_level` (xhigh and max → high). No effort (the default since 2026-10-31,
+    for every model) sends no thinking config, so the model's default thinking applies. `thinking_display="summarized"` →
     `include_thoughts`.
   - Retries: 429/5xx/transport errors, 4 retries with exponential backoff (the SDK retries nothing by default).
     Each failed try is recorded (`ModelResponse.retries`: error, try_s, wait_s) and traced, so slow serving
@@ -1017,7 +1018,7 @@ the landform.
 
 **Evaluation code as built** (M6 Phase B, 2026-10-31; all offline-tested with fake adapters):
 - **Experiments are configs** (`eval/configs/*.yaml`, `eval/config.py`): prompts, seeds, models per role,
-  effort, render level, area, `compare_both_orders` (on for eval runs), per-run budget with per-condition
+  effort (unset = each provider's default, the setting for every eval config), render level, area, `compare_both_orders` (on for eval runs), per-run budget with per-condition
   overrides, and named conditions (critic on/off, rounds, use_spec). E1 `e1_critic` (15 × seeds 1, 2 ×
   critic_on/critic_off = 60 runs), E2 `e2_spec` (the 10 spec_ablation prompts × 2 seeds × spec_off = 20, paired
   with E1's critic_on), `opus` (optional), `pilot` (t01, i01 × seed 1 × both = 4), `regression`. Eval models

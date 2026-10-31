@@ -53,8 +53,9 @@ class EvalConfig(Strict):
     prompts: Literal["all", "spec_ablation", "regression"] | list[str] = "all"
     seeds: list[int] = [1, 2]
     models: Models = Models()
-    effort: Literal["low", "medium", "high", "xhigh", "max"] = "high"  # builder and critic
-    judge_effort: Literal["low", "medium", "high", "xhigh", "max"] = "low"
+    # None: no effort is sent, so each model runs at its provider's default; set only to state one.
+    effort: Literal["low", "medium", "high", "xhigh", "max"] | None = None  # builder and critic
+    judge_effort: Literal["low", "medium", "high", "xhigh", "max"] | None = None
     render: Literal["l1", "l2", "none"] = "l2"
     size: tuple[int, int] = (256, 256)
     base_y: float = 64.0

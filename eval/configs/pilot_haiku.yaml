@@ -5,7 +5,6 @@ prompts: [t01, i01]
 seeds: [1]
 models: {builder: claude-haiku-5-5, critic: claude-haiku-5-5, judge: claude-haiku-5-5}
 judge_same_as_critic_allowed: true  # debugging only: the judge grades with the critic's model
-effort: high
 render: l2
 size: [256, 256]
 compare_both_orders: true

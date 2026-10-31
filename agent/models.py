@@ -71,7 +71,7 @@ PROVIDER_PREFIXES: dict[str, Provider] = {"claude-": "anthropic", "gemini-": "ge
 class ModelConfig:
     model: str = "claude-opus-5-5"
     max_tokens: int = 16000  # thinking counts against this; don't lowball it
-    effort: Effort | None = "high"  # Opus 5.5 defaults to "medium" if unset
+    effort: Effort | None = None  # None: not sent, so the provider's default applies; set only when stated
     refusal_fallback: bool = True  # re-run declined requests on a fallback model (where supported; Anthropic only)
     thinking_display: Literal["omitted", "summarized"] | None = None  # "summarized" = readable reasoning in traces
     provider: Provider | None = None  # None: inferred from the model id prefix
