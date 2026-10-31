@@ -19,6 +19,8 @@ from eval.benchmark import BenchmarkEntry
 from terrain.schema import Strict
 
 DEFAULT_JUDGES = ("gemini-3.1-flash-lite", "claude-opus-5-5")  # the first whose adapter is available
+# The Anthropic SDK refuses non-streaming requests whose max_tokens implies > 10 min (128K tokens/h): 21,333.
+ANTHROPIC_NONSTREAMING_MAX_TOKENS = 21_333
 
 
 class BudgetConfig(Strict):
@@ -60,6 +62,7 @@ class EvalConfig(Strict):
     budget: BudgetConfig = BudgetConfig()
     conditions: dict[str, Condition]
     judge_same_as_critic_allowed: bool = False  # only for pipeline-debugging configs (pilot_haiku)
+    critic_max_tokens: int | None = None  # critic/comparison output limit incl. thinking; None = ModelConfig's 16K
 
     @model_validator(mode="after")
     def _judge_is_not_the_critic(self) -> EvalConfig:
@@ -67,6 +70,11 @@ class EvalConfig(Strict):
             raise ValueError(f"config {self.name}: the judge model ({self.judge_model}) is the critic model; the judge would "
                              "grade with the taste the critic optimized for. Pick another judge (or set "
                              "judge_same_as_critic_allowed: true in a debugging config)")
+        provider = ModelConfig(model=self.models.critic).provider
+        if self.critic_max_tokens and provider == "anthropic" and self.critic_max_tokens > ANTHROPIC_NONSTREAMING_MAX_TOKENS:
+            raise ValueError(f"config {self.name}: critic_max_tokens {self.critic_max_tokens} is above "
+                             f"{ANTHROPIC_NONSTREAMING_MAX_TOKENS}, the most the Anthropic SDK allows without streaming "
+                             f"(critic {self.models.critic})")
         return self
 
     def select(self, entries: list[BenchmarkEntry]) -> list[BenchmarkEntry]:

@@ -43,6 +43,9 @@ MAX_RETRIES = 4  # after the first try: waits of about 1, 2, 4, 8 s
 MAX_TIMEOUT_RETRIES = 1  # a timed-out request is retried once: each try can take the full timeout
 RETRY_BASE_S, RETRY_MAX_S = 1.0, 30.0
 REQUEST_TIMEOUT_S = 180.0  # slowest successful call so far: 110 s (gemini-3.8-flash, EVIDENCE 2026-10-30)
+# A long reply needs time: the M6 pilot's critiques ran at ~120 output tokens/s (thinking included), so the
+# timeout grows to max_tokens / this rate when that is longer than REQUEST_TIMEOUT_S.
+MIN_OUTPUT_TOKENS_PER_S = 100.0
 
 
 class GeminiStopError(ModelReplyError):
@@ -82,15 +85,22 @@ class GeminiPart:
     type: str = field(default="gemini_part", init=False)
 
 
+def request_timeout(config: ModelConfig) -> float:
+    """Seconds per try: enough for a reply of max_tokens at MIN_OUTPUT_TOKENS_PER_S, at least REQUEST_TIMEOUT_S."""
+    return max(REQUEST_TIMEOUT_S, config.max_tokens / MIN_OUTPUT_TOKENS_PER_S)
+
+
 @dataclass
 class GeminiAdapter:
     config: ModelConfig = field(default_factory=lambda: ModelConfig(model="gemini-3.8-flash"))
     client: Any = None  # google.genai.Client; injectable for tests
     sleep: Callable[[float], None] = time.sleep  # injectable for retry tests
-    timeout_s: float = REQUEST_TIMEOUT_S  # per try; a timeout counts as a retryable transport error
+    timeout_s: float | None = None  # per try (None: request_timeout(config)); a timeout is a retryable transport error
     _tools_cache: tuple[Any, Any] | None = field(default=None, init=False, repr=False)
 
     def __post_init__(self) -> None:
+        if self.timeout_s is None:
+            self.timeout_s = request_timeout(self.config)
         try:
             from google import genai
         except ImportError as e:

@@ -8,6 +8,7 @@ effort: high
 render: l2
 size: [256, 256]
 compare_both_orders: true
+critic_max_tokens: 32000  # gemini-3.8-flash writes ~9.5K tokens per critique (thinking included); 16K truncated 1 of 7 in the pilot
 budget: {max_steps: 40, max_cost_usd: 1.00, max_seconds: 900}
 conditions:
   spec_off: {critic: true, rounds: 3, use_spec: false}

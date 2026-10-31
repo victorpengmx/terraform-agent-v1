@@ -57,7 +57,8 @@ def run_config(config: EvalConfig, run: PlannedRun, suite_dir: Path) -> RunConfi
     cond = config.conditions[run.condition]
     return RunConfig(prompt=run.entry.prompt or "", images=tuple(suite_dir / r for r in run.entry.references),
                      model=config.models.builder, effort=config.effort, critic=cond.critic,
-                     critic_model=config.models.critic, rounds=cond.rounds if cond.critic else 1, size=tuple(config.size),
+                     critic_model=config.models.critic, critic_max_tokens=config.critic_max_tokens,
+                     rounds=cond.rounds if cond.critic else 1, size=tuple(config.size),
                      base_y=config.base_y, seed=run.seed, budget=config.budget_for(run.condition), render=config.render,
                      use_spec=cond.use_spec, compare_both_orders=config.compare_both_orders)
 
@@ -121,7 +122,7 @@ def run_one(run: PlannedRun, config: EvalConfig, results: Path, suite_dir: Path,
         "models": {"builder": cfg.model, "critic": cfg.critic_model if cfg.critic else None,
                    "judge": judge_model.config.model if judge_model else config.judge_model,
                    "judge_same_family": same_family(config.judge_model, cfg.model, cfg.critic_model if cfg.critic else None)},
-        "settings": {"critic": cfg.critic, "rounds": cfg.rounds, "use_spec": cfg.use_spec, "render": cfg.render,
+        "settings": {"critic": cfg.critic, "critic_max_tokens": cfg.critic_max_tokens if cfg.critic else None, "rounds": cfg.rounds, "use_spec": cfg.use_spec, "render": cfg.render,
                      "compare_both_orders": cfg.compare_both_orders, "budget": cfg.budget.__dict__},
         "trace": tracer.path.as_posix(), "stack": (run_dir / "stack.json").as_posix(),
     }

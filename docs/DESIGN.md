@@ -1024,6 +1024,10 @@ the landform.
   (2026-10-31), set explicitly in every config: builder `claude-haiku-5-5`, critic `gemini-3.8-flash`, judge
   `claude-opus-5-5`; `opus` uses Opus as builder and critic with a `gemini-3.8-flash` judge. A config whose
   judge is its critic model is rejected: the judge would grade with the taste the critic optimized for.
+  The Gemini-critic configs set `critic_max_tokens: 32000` (critique and comparison output, thinking
+  included; the pilot's critiques used ~9.5K and one of seven hit 16K); the Gemini request timeout grows to
+  max_tokens / 100 tokens/s (320 s) so a long reply isn't cut off as a timeout instead. An Anthropic critic
+  can't go above 21,333 without streaming, and the config check says so.
   `pilot_haiku` (the pilot's plan with every role on Haiku, `judge_same_as_critic_allowed`) debugs the
   pipeline cheaply before `pilot`. The report names the family the judge shares: the builder's is acceptable
   for E1/E2 (both arms use the same builder), the critic's would favour critic_on.

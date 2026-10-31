@@ -111,3 +111,21 @@ def test_save_final_keeps_stack_when_l2_fails(tmp_path, capsys):
     written = save_final(session, tmp_path, l2_views=("not_a_view",))
     assert [p.name for p in written] == ["stack.json", "final_l1.png"]
     assert "final L2 render failed" in capsys.readouterr().out
+
+
+def test_execute_gives_the_critic_its_own_output_limit(tmp_path):
+    from agent.run import execute
+
+    made = []
+
+    def make_model(config):
+        made.append(config)
+        return ScriptedModel(response(text("nothing to build")))
+
+    execute(_args(critic_model="gemini-3.8-flash", critic_max_tokens=32_000, render="none", size=(17, 17), use_spec=False,
+                  rounds=1), Tracer(run_id="t", root=tmp_path), tmp_path / "out", make_model=make_model)
+    builder, critic = made
+    assert builder.model == "claude-haiku-5-5" and builder.max_tokens == 16_000
+    assert critic.model == "gemini-3.8-flash" and critic.max_tokens == 32_000
+    header = json.loads((tmp_path / "t.jsonl").read_text(encoding="utf-8").splitlines()[0])["header"]
+    assert header["critic_max_tokens"] == 32_000

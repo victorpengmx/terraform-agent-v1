@@ -104,3 +104,14 @@ def test_a_judge_equal_to_the_critic_is_rejected_unless_allowed():
     with pytest.raises(ValueError, match="judge model \\(claude-opus-5-5\\) is the critic model"):
         EvalConfig.model_validate(cfg)
     assert EvalConfig.model_validate(cfg | {"judge_same_as_critic_allowed": True}).judge_model == "claude-opus-5-5"
+
+
+def test_critic_max_tokens_is_set_for_the_gemini_critic_and_capped_for_anthropic():
+    for name in ("e1_critic", "e2_spec", "pilot", "regression"):
+        assert load_config(f"eval/configs/{name}.yaml").critic_max_tokens == 32_000, name
+    for name in ("opus", "pilot_haiku"):
+        assert load_config(f"eval/configs/{name}.yaml").critic_max_tokens is None, name  # Anthropic critic: 16K default
+    cfg = {"name": "x", "models": {"critic": "claude-opus-5-5", "judge": "gemini-3.8-flash"}, "conditions": {"a": {"critic": True}}}
+    with pytest.raises(ValueError, match="above 21333, the most the Anthropic SDK allows without streaming"):
+        EvalConfig.model_validate(cfg | {"critic_max_tokens": 32_000})
+    assert EvalConfig.model_validate(cfg | {"critic_max_tokens": 20_000}).critic_max_tokens == 20_000

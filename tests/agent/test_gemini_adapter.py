@@ -325,3 +325,14 @@ def test_requests_run_on_a_worker_thread_so_ctrl_c_gets_through():
     client.models.generate_content = lambda **kw: threads.append(threading.current_thread().name) or inner(**kw)
     assert model.complete([{"role": "user", "content": "x"}]).text == "hi"
     assert threads == ["gemini-request"]
+
+
+def test_the_timeout_grows_with_the_output_limit():
+    from agent.gemini import request_timeout
+
+    assert request_timeout(ModelConfig(model=MODEL)) == 180.0  # 16K at 100 tokens/s = 160 s: the floor holds
+    assert request_timeout(ModelConfig(model=MODEL, max_tokens=32_000)) == 320.0
+    model, client = adapter(reply({"text": "hi"}), max_tokens=32_000)
+    model.complete([{"role": "user", "content": "x"}])
+    assert client.calls[0]["config"].http_options.timeout == 320_000  # ms
+    assert GeminiAdapter(ModelConfig(model=MODEL), client=FakeClient(), timeout_s=5.0).timeout_s == 5.0
