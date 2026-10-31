@@ -107,8 +107,10 @@ Fill in as they are created.
   `python -m eval.run_eval --config eval/configs/e1_critic.yaml [--dry-run] [--yes] [--workers 3]`
 - Re-score saved runs (free; `--judge` re-judges, uncached calls need `--yes`): `python -m eval.rescore eval/results/<id>`
 - Report: `python -m eval.report eval/results/e1_critic eval/results/e2_spec --name <name> [--calibration <name>]`
-- Judge calibration: `python -m eval.calibrate sample eval/results/e1_critic --name <name>`, then
-  `python -m eval.calibrate score <name>`
+  (M6 results: `eval/reports/2026-11-01-m6.md`, calibration set `m6`)
+- Judge calibration: `python -m eval.calibrate sample eval/results/e1_critic eval/results/e2_spec --name <name>`,
+  fill in `eval/calibration/<name>/ratings.csv` (screenshot items: compile each stack into TerraformEval at
+  the sheet's `--origin`), then `python -m eval.calibrate score <name>`
 - Regression (paid): `python -m eval.regression [--yes] [--update-baseline]`
 - Eval builds compile into the `TerraformEval` world (flat, top at y=64)
 

@@ -105,24 +105,26 @@ Design text and images together; build text first, then images on the same forma
 
 ### M6. Mini-evaluation (§16)
 
-- [ ] `eval/benchmark.yaml`: ~15 text + ~5 image prompts, each with a hand-written expected feature graph
+Done 2026-11-01: `eval/reports/2026-11-01-m6.md` (results summary in DESIGN §16, numbers in EVIDENCE).
+80 runs for $5.90 plus $0.83 of pilots; recreate with `python -m eval.reproduce all --yes`.
+
+- [x] `eval/benchmark.yaml`: ~15 text + ~5 image prompts, each with a hand-written expected feature graph
       (ground truth for the checks)
-      Scoped to 10 text + 5 image (DESIGN §16). Text entries, validator (`eval/benchmark.py`) and demo sanity
-      check done; image entries i01–i05 drafted with sources. i02–i04 have no stated license: keep them out of
-      the public repo (M7).
+      Scoped to 10 text + 5 image (DESIGN §16). i02–i04 have no stated license: keep them out of the public
+      repo (M7).
 - [x] Tag-independent feature matcher for the eval checks (`eval/match.py`, §16)
-- [ ] `eval/run_eval.py`: one row per run (success, judge score, checklist pass rate, steps, tokens, cost,
+- [x] `eval/run_eval.py`: one row per run (success, judge score, checklist pass rate, steps, tokens, cost,
       latency, tokens/cost per successful build, model ids, git commit); text and image reported separately
-      Code done and offline-tested (configs, resumable runner, cost gate, rescore; DESIGN §16); pilot pending.
-- [ ] SPEC quality: agent graph vs. hand-written graph (features found, categories, relations)
-      Code done (`eval/spec_quality.py`); needs real runs.
-- [ ] Eval judge with a prompt separate from the critic
-      Code done (`eval/judge.py`, `eval/prompts.py`, cached); not yet run live; calibration (E3) after the runs.
-- [ ] Ablations: critic on vs. off; SPEC on vs. off (2 seeds if budget allows)
-      Configs `e1_critic` (60 runs) and `e2_spec` (20 runs) ready, every role priced. Phase C order:
-      `pilot_haiku`, then `pilot`, then e1, e2.
-- [ ] Report in `eval/reports/` with a results table and honest limitations
-      Code done (`eval/report.py`); sample from fake data in `eval/reports/2026-10-31-SAMPLE-fake-data.md`.
+      Resumable, cost-gated, parallel workers; rescore and regression on top.
+- [x] SPEC quality: agent graph vs. hand-written graph (features found, categories, relations)
+      E5: feature recall 95% (text 98%, image 89%); image relations 38%, image slopes 15% exact.
+- [x] Eval judge with a prompt separate from the critic
+      E3 against one human rater (30 items): agreement 73%, κ 0.39 (renders κ 0.56, screenshots κ 0.00);
+      more lenient than the rater.
+- [x] Ablations: critic on vs. off; SPEC on vs. off (2 seeds)
+      E1: critic raises the judge's mean (+0.25, CI excludes 0); success and pass rate no clear difference.
+      E2: no SPEC benefit at this N (judge mean slightly favours spec_off).
+- [x] Report in `eval/reports/` with a results table and honest limitations
 
 ### M7. Presentable repo
 
@@ -146,6 +148,7 @@ on/off ablation. Never cut the acceptance gate, the checklist's category checks 
 Pick by benchmark failures, not by appeal.
 
 ### A. Spec, planning and stages (§9)
+- [ ] Larger SPEC on/off ablation: M6 E2 showed no SPEC benefit at N = 10 prompts (EVIDENCE 2026-10-31)
 - [ ] CLARIFY before SPEC; user approval of the graph; richer relations (§9.3)
 - [ ] Outer state machine with staged builds and objective stage gates (§9.1)
 - [ ] Dominant-feature map, derived counts in observations, feature drift (§4.3)
@@ -160,6 +163,10 @@ Pick by benchmark failures, not by appeal.
       different-family critic/judge evaluation still open.
 
 ### C. Tools (§5.10, §5.11, §6)
+- [ ] M6 systematic failures: t02 volcano and t04 ridge never found, t09 river-from-mountains and
+      mountains-behind-lake never met (tool or matcher; EVIDENCE 2026-10-31)
+- [ ] M6 calibration notes: ranges squashed north-south, cone-shaped peaks, abrupt plain-to-mountain
+      transitions, flat stone lake beds, cylindrical mesas, hills too small (EVIDENCE 2026-11-01)
 - [ ] Graded `carve_valley`; mountain-range recipe (`raise_ridge` done early, M4.5)
 - [ ] Vanilla-style defaults; badlands palette preset (§6.3)
 - [ ] Water hard cases: shallow fringes, river vs. lake, stepped-pool waterfalls
@@ -181,6 +188,8 @@ Pick by benchmark failures, not by appeal.
 ### F. Full evaluation and baselines (§16)
 - [ ] 30–50 prompts, more references, some sketches
 - [ ] Human calibration (~40 ratings); pairwise/Elo judge; CLIP only if it tracks humans
+      M6 E3: the judge passes at the floor (all 3s) and is lenient; try a prompt that uses the whole scale,
+      and in-game views for the judge if the screenshot disagreement holds at larger N
 - [ ] MCP server + generic-client baseline; optional VibeCraft comparison
 - [ ] Ablations: low-level vs. semantic tools; model A vs. B; annotated renders; code-as-action
 

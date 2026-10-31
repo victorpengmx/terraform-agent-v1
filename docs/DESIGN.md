@@ -1081,6 +1081,25 @@ the landform.
 - **Regression** (E7, `eval/regression.py`): the 5 regression prompts × seed 1 × critic_on against
   `eval/baselines/regression.json`; flags success true → false and pass-rate drops > 0.10, warns on cost +50%.
 
+**Results** (M6 Phase C, 2026-10-31 to 2026-11-01; `eval/reports/2026-11-01-m6.md`, EVIDENCE has the full
+numbers). Builder `claude-haiku-5-5`, critic `gemini-3.8-flash`, judge `claude-opus-5-5`, default effort,
+3 workers. 80 runs (E1 60, E2 20) for $5.90 ($3.73 agent, $2.17 judge), plus $0.83 of pilots (three pilots of 4 runs).
+- **E1 critic on vs off:** success 17% vs 7% and checklist pass rate 82% vs 83%: no clear difference at this
+  N. Judge mean 2.63 vs 2.38: critic_on higher (+0.25, 95% CI +0.03 to +0.44), carried by the text prompts.
+  The critic costs about 19× the agent spend ($0.075 vs $0.004 per run) and about 8× the median latency.
+- **E2 SPEC on vs off** (both with the critic): success 20% vs 30%, pass rate 80% vs 78%: no clear difference.
+  Judge mean 2.70 vs 2.88: the CI favours spec_off (-0.18, -0.34 to -0.03), the sign test doesn't (p = 0.27).
+  The SPEC has not yet shown the layout benefit it was built for; it stays pending a larger ablation.
+- **Gate (§11.4) is unbiased:** across 176 blind comparisons the revision won 58–59% and Terrain 1 51–52%.
+- **E3 judge vs one human rater** (30 items): pass/fail agreement 73%, κ 0.39 (renders 82%, κ 0.56;
+  in-game screenshots 50%, κ 0.00, n = 8). The judge is more lenient (mean 2.66 vs 2.16) and its passes all
+  sit at the bar (lowest score 3), so success rates are an upper bound by the human's standard. Comparisons
+  between conditions remain valid: both arms are judged alike.
+- **E5:** the agent's SPEC finds 95% of answer-key features (text 98%, image 89%); image SPECs miss relations
+  (38%) and slopes (15% exact).
+- **No image prompt succeeded** in any condition. Answer-key items that failed in every run of their prompt
+  (t02 volcano, t04 ridge, two t09 relations) point at tool or matcher gaps, not seed noise.
+
 **[Later]**
 - 30–50 prompts, more references, some sketches.
 - Human calibration: ~40 ratings incl. "faithful but ugly" and "pretty but loose" cases; judge–human
