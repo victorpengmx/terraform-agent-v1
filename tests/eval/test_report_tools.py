@@ -72,6 +72,21 @@ def test_judge_cost_survives_a_cached_rescore():
     assert report.money(0.0042) == "$0.004" and report.money(12.345) == "$12.35"
 
 
+def test_the_judge_mean_is_a_paired_metric_in_score_units(tmp_path):
+    """Both arms fail the judge (a floor on success), but critic_on scores 0.5 higher on looks in every pair."""
+    rows = []
+    for p in range(1, 7):
+        for cond, score in (("critic_on", 2.75), ("critic_off", 2.25)):
+            r = row(f"t0{p}", "text", cond, 1, overall=False, pass_rate=0.8)
+            r["judge"] |= {"mean": score, "passed": False}
+            rows.append(r)
+    text = report.render(rows, "x", [tmp_path], KEYS).split("## E2")[0]
+    assert "| all | success | 0 / 0 / 6 |" in text  # the floor: success can't tell the arms apart
+    assert "| all | judge mean (1-5) | 6 / 0 / 0 | 0 | 0.031 | +0.500 [+0.500, +0.500] | critic_on higher |" in text
+    assert "| all | `critic_on` | 6 | 0% | 0 | 80% | 2.75 |" in text and "mean judge score (1-5)" in text
+    assert "`critic_on` judge" in text and "| t01 | text | ✗ | 80% | 2.75 | ✗ | 80% | 2.25 |" in text
+
+
 def test_no_successes_is_not_an_unknown_cost(tmp_path):
     rows = [row("t01", "text", "critic_on", 1, overall=False, pass_rate=0.9)]
     e4 = report.render(rows, "x", [tmp_path], KEYS).split("## E4")[1]

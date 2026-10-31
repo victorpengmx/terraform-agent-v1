@@ -1060,7 +1060,9 @@ the landform.
   and a 95% bootstrap CI of the paired difference that resamples prompts (each prompt's seeds averaged
   first; 10 000 samples, fixed seed). Verdicts in plain words: "no clear difference at this N" when the CI
   includes 0, and none at all below 5 prompts, where the CI collapses onto the few values there are.
-- **Report** (`eval/report.py`): E1, E2 (all, text, image; per-prompt table), E4 (cost and tokens per
+- **Report** (`eval/report.py`): E1, E2 (all, text, image; per-prompt table; three paired metrics: success, the
+  checklist pass rate (layout, continuous) and the judge's mean score (looks, continuous, 1–5), so a floor of
+  judge failures in both arms still leaves a measure of looks), E4 (cost and tokens per
   successful build, p50/p95 latency, calls, tool-error rate, critic fix validity, rollback rate, revision and
   Terrain 1 win rates), E5, E3 when scored, and limitations computed from the rows; plus a runs CSV.
 - **Judge calibration** (E3, `eval/calibrate.py`): a seeded sample of ~30 judged runs stratified by verdict ×
