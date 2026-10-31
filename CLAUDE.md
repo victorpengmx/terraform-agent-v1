@@ -100,6 +100,8 @@ Fill in as they are created.
 - Run agent: `python -m agent.run --prompt "..."`
 - Gemini smoke check (paid): `python -m scripts.experiments.gemini_smoke --model gemini-...`
 - Validate the benchmark (coverage matrix, demo sanity check): `python -m eval.benchmark --demos`
+- Recreate the eval experiments (each as its exact commands; paid steps spend only with `--yes`; resumes):
+  `python -m eval.reproduce --list`, then e.g. `python -m eval.reproduce pilot_haiku pilot [--yes]` or `all`
 - Benchmark (paid; prints the cost estimate, spends only with `--yes`; resumes):
   `python -m eval.run_eval --config eval/configs/e1_critic.yaml [--dry-run] [--yes]`
 - Re-score saved runs (free; `--judge` re-judges, uncached calls need `--yes`): `python -m eval.rescore eval/results/<id>`

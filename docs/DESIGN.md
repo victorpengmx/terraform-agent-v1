@@ -1064,6 +1064,10 @@ the landform.
   item names); 8 items are rated from in-game screenshots of TerraformEval. Scoring: Spearman (human mean
   vs judge mean), pass/fail agreement, Cohen's κ and the confusion matrix, for render- and screenshot-rated
   items separately.
+- **Reproduction** (`eval/reproduce.py`): every experiment (validate, pilot_haiku, pilot, e1, e2, report,
+  opus, regression, calibration) as the exact command sequence that produces it (run, rescore, report), so a
+  checkout of a commit plus `python -m eval.reproduce all --yes` recreates the results; paid steps keep the
+  cost gate and finished runs are skipped.
 - **Regression** (E7, `eval/regression.py`): the 5 regression prompts × seed 1 × critic_on against
   `eval/baselines/regression.json`; flags success true → false and pass-rate drops > 0.10, warns on cost +50%.
 
