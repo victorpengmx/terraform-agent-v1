@@ -2,7 +2,7 @@
 name: e1_critic
 prompts: all
 seeds: [1, 2]
-models: {builder: claude-haiku-5-5, critic: claude-opus-5-5, judge: null}  # null judge: gemini-3.1-flash-lite if installed, else claude-opus-5-5
+models: {builder: claude-haiku-5-5, critic: gemini-3.8-flash, judge: claude-opus-5-5}
 effort: high
 render: l2
 size: [256, 256]

@@ -24,6 +24,7 @@ from typing import Any, Iterable
 
 from eval import spec_quality, stats
 from eval.benchmark import SUITE, load
+from eval.config import shared_family
 from eval.rows import read_rows
 
 REPORTS = Path("eval/reports")
@@ -243,7 +244,7 @@ def limitations(rows: list[dict[str, Any]], calibrated: bool) -> list[str]:
     prompts = {r["prompt_id"]: r["kind"] for r in d}
     seeds = sorted({r["seed"] for r in d})
     models = Counter((r["models"]["builder"], r["models"].get("critic"), r["models"]["judge"]) for r in d)
-    same = sum(bool(r["models"].get("judge_same_family")) for r in d)
+    shared = Counter(role for r in d for role in shared_family(r["models"]))
     judge_unknown = sum(overall(r) is None for r in d)
     errors = [r for r in rows if r.get("status") == "error"]
     budget = sum(str(r.get("stop", "")).startswith("budget") for r in d)
@@ -254,8 +255,12 @@ def limitations(rows: list[dict[str, Any]], calibrated: bool) -> list[str]:
                "Differences smaller than the CIs above can't be told apart from noise.")
     for (b, c, j), n in sorted(models.items(), key=lambda kv: -kv[1]):
         out.append(f"- Models ({n} runs): builder `{b}`, critic `{c or 'off'}`, judge `{j}`.")
-    if same:
-        out.append(f"- The judge is from the same model family as the builder or critic in {same} runs (judge_same_family).")
+    if shared["builder"]:
+        out.append(f"- The judge shares the builder's model family in {shared['builder']} runs. Acceptable for E1 and E2: "
+                   "both arms of each comparison use the same builder, so a family preference affects them alike.")
+    if shared["critic"]:
+        out.append(f"- The judge shares the critic's model family in {shared['critic']} runs: it may share the taste the "
+                   "critic optimized for, which favours critic_on in E1.")
     out.append("- The judge is human-calibrated (E3 below)." if calibrated else
                "- The judge is not yet calibrated against human ratings (E3 pending); its pass/fail is part of success.")
     if judge_unknown:

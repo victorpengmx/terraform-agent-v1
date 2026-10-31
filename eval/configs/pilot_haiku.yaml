@@ -1,0 +1,15 @@
+# Pilot on Haiku for every role: the pilot's 4 runs at debugging cost, to check the pipeline (rows, renders,
+# judge outputs, report) before the pilot on the eval models. Not a measurement: the judge is the critic.
+name: pilot_haiku
+prompts: [t01, i01]
+seeds: [1]
+models: {builder: claude-haiku-5-5, critic: claude-haiku-5-5, judge: claude-haiku-5-5}
+judge_same_as_critic_allowed: true  # debugging only: the judge grades with the critic's model
+effort: high
+render: l2
+size: [256, 256]
+compare_both_orders: true
+budget: {max_steps: 40, max_cost_usd: 1.00, max_seconds: 900}
+conditions:
+  critic_on: {critic: true, rounds: 3, use_spec: true}
+  critic_off: {critic: false, use_spec: true, budget: {max_cost_usd: 0.25}}

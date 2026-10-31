@@ -53,6 +53,17 @@ def test_small_n_reads_as_no_clear_difference(tmp_path):
     assert "no clear difference at this N" in text and "critic_on higher" not in text
 
 
+def test_limitations_name_the_family_the_judge_shares(tmp_path):
+    eval_models = {"builder": "claude-haiku-5-5", "critic": "gemini-3.8-flash", "judge": "claude-opus-5-5"}
+    rows = [row("t01", "text", "critic_on", 1, overall=True, pass_rate=1.0, models=eval_models)]
+    text = report.render(rows, "x", [tmp_path], KEYS)
+    assert "shares the builder's model family in 1 runs. Acceptable for E1 and E2" in text
+    assert "critic's model family" not in text
+    rows = [row("t01", "text", "critic_on", 1, overall=True, pass_rate=1.0,
+                models=eval_models | {"critic": "claude-opus-5-5", "builder": "gemini-3.8-flash"})]
+    assert "shares the critic's model family in 1 runs" in report.render(rows, "x", [tmp_path], KEYS)
+
+
 def test_a_judge_failure_leaves_success_unknown_not_failed(tmp_path):
     rows = [row("t01", "text", "critic_on", 1, overall=None, pass_rate=0.9), row("t01", "text", "critic_off", 1, overall=True, pass_rate=0.5)]
     s = report.condition_summary(rows, "critic_on", None)

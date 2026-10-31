@@ -11,6 +11,7 @@ from pathlib import Path
 from typing import Literal
 
 import yaml
+from pydantic import model_validator
 
 from agent.budget import Budget
 from agent.models import ModelConfig
@@ -58,6 +59,15 @@ class EvalConfig(Strict):
     compare_both_orders: bool = True  # DESIGN §11.4: for eval runs
     budget: BudgetConfig = BudgetConfig()
     conditions: dict[str, Condition]
+    judge_same_as_critic_allowed: bool = False  # only for pipeline-debugging configs (pilot_haiku)
+
+    @model_validator(mode="after")
+    def _judge_is_not_the_critic(self) -> EvalConfig:
+        if self.judge_model == self.models.critic and not self.judge_same_as_critic_allowed:
+            raise ValueError(f"config {self.name}: the judge model ({self.judge_model}) is the critic model; the judge would "
+                             "grade with the taste the critic optimized for. Pick another judge (or set "
+                             "judge_same_as_critic_allowed: true in a debugging config)")
+        return self
 
     def select(self, entries: list[BenchmarkEntry]) -> list[BenchmarkEntry]:
         """The benchmark entries this config runs, in benchmark order."""
@@ -95,6 +105,13 @@ def default_judge() -> str:
 def same_family(judge: str, *others: str | None) -> bool:
     provider = ModelConfig(model=judge).provider
     return any(o is not None and ModelConfig(model=o).provider == provider for o in others)
+
+
+def shared_family(models: dict[str, str | None]) -> list[str]:
+    """The roles (builder, critic) whose model is from the judge's family, from a row's `models`."""
+    provider = ModelConfig(model=models["judge"]).provider
+    return [role for role in ("builder", "critic")
+            if models.get(role) and ModelConfig(model=models[role]).provider == provider]
 
 
 def load_config(path: Path) -> EvalConfig:

@@ -2,7 +2,7 @@
 name: opus
 prompts: all
 seeds: [1]
-models: {builder: claude-opus-5-5, critic: claude-opus-5-5, judge: null}
+models: {builder: claude-opus-5-5, critic: claude-opus-5-5, judge: gemini-3.8-flash}
 effort: high
 render: l2
 size: [256, 256]

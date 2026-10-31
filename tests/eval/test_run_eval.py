@@ -110,13 +110,13 @@ def test_finished_runs_are_skipped_and_errors_retried(tmp_path):
 def test_the_cost_gate_spends_nothing_without_yes(tmp_path, monkeypatch, capsys):
     monkeypatch.setattr(run_eval, "RESULTS", tmp_path)
     monkeypatch.setattr(run_eval, "evaluate", lambda *a, **k: pytest.fail("evaluate ran without --yes"))
-    monkeypatch.setattr(sys, "argv", ["run_eval", "--config", "eval/configs/e1_critic.yaml"])
+    monkeypatch.setattr(sys, "argv", ["run_eval", "--config", "eval/configs/pilot_haiku.yaml"])
     with pytest.raises(SystemExit, match="--yes"):
         run_eval.main()
     out = capsys.readouterr().out
-    assert "60 pending runs; estimated cost up to $37.71" in out
-    assert "critic_on: 30 runs x $1.00 cap = $30.00" in out and "critic_off: 30 runs x $0.25 cap = $7.50" in out
-    monkeypatch.setattr(sys, "argv", ["run_eval", "--config", "eval/configs/e1_critic.yaml", "--dry-run", "--yes"])
+    assert "4 pending runs; estimated cost up to $2.51" in out
+    assert "critic_on: 2 runs x $1.00 cap = $2.00" in out and "critic_off: 2 runs x $0.25 cap = $0.50" in out
+    monkeypatch.setattr(sys, "argv", ["run_eval", "--config", "eval/configs/pilot_haiku.yaml", "--dry-run", "--yes"])
     run_eval.main()  # a dry run never spends, even with --yes
 
 

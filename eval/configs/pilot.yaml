@@ -1,8 +1,9 @@
-# Pilot: 1 text + 1 image prompt x seed 1 x both E1 conditions = 4 runs (Phase C step 1).
+# Pilot: 1 text + 1 image prompt x seed 1 x both E1 conditions = 4 runs, on the eval models. Phase C runs
+# pilot_haiku first (same plan, every role on Haiku) to debug the pipeline cheaply.
 name: pilot
 prompts: [t01, i01]
 seeds: [1]
-models: {builder: claude-haiku-5-5, critic: claude-opus-5-5, judge: null}
+models: {builder: claude-haiku-5-5, critic: gemini-3.8-flash, judge: claude-opus-5-5}
 effort: high
 render: l2
 size: [256, 256]

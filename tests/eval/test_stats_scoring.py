@@ -4,7 +4,7 @@ import pytest
 
 from eval import stats
 from eval.benchmark import load
-from eval.config import EvalConfig, load_config, same_family
+from eval.config import EvalConfig, load_config, same_family, shared_family
 from eval.scoring import answer_key, checks, success
 from scripts.demos import build
 
@@ -83,3 +83,24 @@ def test_a_mistyped_config_key_is_rejected(tmp_path):
 def test_judge_family():
     assert same_family("claude-opus-5-5", "claude-haiku-5-5", None)
     assert not same_family("gemini-3.1-flash-lite", "claude-haiku-5-5", "claude-opus-5-5")
+    assert shared_family({"builder": "claude-haiku-5-5", "critic": "gemini-3.8-flash", "judge": "claude-opus-5-5"}) == ["builder"]
+    assert shared_family({"builder": "claude-opus-5-5", "critic": "claude-opus-5-5", "judge": "gemini-3.8-flash"}) == []
+    assert shared_family({"builder": "claude-haiku-5-5", "critic": None, "judge": "claude-opus-5-5"}) == ["builder"]
+
+
+def test_the_eval_configs_use_the_eval_models():
+    for name in ("e1_critic", "e2_spec", "pilot", "regression"):
+        m = load_config(f"eval/configs/{name}.yaml").models
+        assert (m.builder, m.critic, m.judge) == ("claude-haiku-5-5", "gemini-3.8-flash", "claude-opus-5-5"), name
+    m = load_config("eval/configs/opus.yaml").models
+    assert (m.builder, m.critic, m.judge) == ("claude-opus-5-5", "claude-opus-5-5", "gemini-3.8-flash")
+    haiku, pilot = load_config("eval/configs/pilot_haiku.yaml"), load_config("eval/configs/pilot.yaml")
+    assert {haiku.models.builder, haiku.models.critic, haiku.judge_model} == {"claude-haiku-5-5"}
+    assert (haiku.prompts, haiku.seeds, list(haiku.conditions)) == (pilot.prompts, pilot.seeds, list(pilot.conditions))
+
+
+def test_a_judge_equal_to_the_critic_is_rejected_unless_allowed():
+    cfg = {"name": "x", "models": {"critic": "claude-opus-5-5", "judge": "claude-opus-5-5"}, "conditions": {"a": {"critic": True}}}
+    with pytest.raises(ValueError, match="judge model \\(claude-opus-5-5\\) is the critic model"):
+        EvalConfig.model_validate(cfg)
+    assert EvalConfig.model_validate(cfg | {"judge_same_as_critic_allowed": True}).judge_model == "claude-opus-5-5"

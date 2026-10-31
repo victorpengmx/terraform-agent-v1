@@ -1016,9 +1016,13 @@ the landform.
   effort, render level, area, `compare_both_orders` (on for eval runs), per-run budget with per-condition
   overrides, and named conditions (critic on/off, rounds, use_spec). E1 `e1_critic` (15 × seeds 1, 2 ×
   critic_on/critic_off = 60 runs), E2 `e2_spec` (the 10 spec_ablation prompts × 2 seeds × spec_off = 20, paired
-  with E1's critic_on), `opus` (optional), `pilot` (t01, i01 × seed 1 × both = 4), `regression`. Defaults:
-  builder Haiku 5.5, critic Opus 5.5, judge `gemini-3.1-flash-lite` when the gemini extra is installed (else
-  Opus, marked `judge_same_family`).
+  with E1's critic_on), `opus` (optional), `pilot` (t01, i01 × seed 1 × both = 4), `regression`. Eval models
+  (2026-10-31), set explicitly in every config: builder `claude-haiku-5-5`, critic `gemini-3.8-flash`, judge
+  `claude-opus-5-5`; `opus` uses Opus as builder and critic with a `gemini-3.8-flash` judge. A config whose
+  judge is its critic model is rejected: the judge would grade with the taste the critic optimized for.
+  `pilot_haiku` (the pilot's plan with every role on Haiku, `judge_same_as_critic_allowed`) debugs the
+  pipeline cheaply before `pilot`. The report names the family the judge shares: the builder's is acceptable
+  for E1/E2 (both arms use the same builder), the critic's would favour critic_on.
 - **Runner** (`eval/run_eval.py`): calls `agent.run.execute` in-process (the CLI's wiring, now shared through
   `RunConfig`) with the config's seed as canvas seed, so (prompt, seed) pairs match across conditions. The
   agent never gets the answer key: it writes its own SPEC or none; a test checks that no answer-key id reaches
