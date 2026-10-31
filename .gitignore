@@ -37,3 +37,4 @@ eval/results/
 eval/cache/
 eval/calibration/*/images/
 eval/calibration/*/stacks/
+eval/calibration/*/screenshots/
