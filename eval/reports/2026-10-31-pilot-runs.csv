@@ -1,0 +1,5 @@
+folder,key,prompt_id,kind,condition,seed,status,stop,rounds,accepted_round,success,success_checklist,success_checks,success_judge,pass_rate,passed,total,major_failures,checks_failed,judge_mean,judge_verdict,cost_usd,judge_cost_usd,latency_s,steps,tool_calls,tool_errors,builder,critic,judge,judge_same_family
+pilot,t01-critic_on-s1,t01,text,critic_on,1,done,max_rounds,3,3,False,True,True,False,0.9090909090909091,10,11,,,2.3333333333333335,fail,0.15974534999999995,0.025586,527.4,21,18,0,claude-haiku-5-5,gemini-3.8-flash,claude-opus-5-5,True
+pilot,t01-critic_off-s1,t01,text,critic_off,1,done,done,1,,True,True,True,True,1.0,11,11,,,3.0,pass,0.008140255,0.019194799999999998,34.8,8,11,0,claude-haiku-5-5,,claude-opus-5-5,True
+pilot,i01-critic_on-s1,i01,image,critic_on,1,done,max_rounds,3,3,False,False,True,False,0.8,8,10,peak_left.position slope_near.position,,2.5,fail,0.22776069000000004,0.033221,521.5,25,26,0,claude-haiku-5-5,gemini-3.8-flash,claude-opus-5-5,True
+pilot,i01-critic_off-s1,i01,image,critic_off,1,done,done,1,,False,False,True,False,0.7,7,10,slope_near.exists,,2.25,fail,0.005650095000000002,0.0291698,37.1,8,11,0,claude-haiku-5-5,,claude-opus-5-5,True

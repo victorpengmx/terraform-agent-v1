@@ -72,6 +72,12 @@ def test_judge_cost_survives_a_cached_rescore():
     assert report.money(0.0042) == "$0.004" and report.money(12.345) == "$12.35"
 
 
+def test_no_successes_is_not_an_unknown_cost(tmp_path):
+    rows = [row("t01", "text", "critic_on", 1, overall=False, pass_rate=0.9)]
+    e4 = report.render(rows, "x", [tmp_path], KEYS).split("## E4")[1]
+    assert "| cost per successful build | n/a (0 successes) |" in e4 and "unknown" not in e4
+
+
 def test_a_judge_failure_leaves_success_unknown_not_failed(tmp_path):
     rows = [row("t01", "text", "critic_on", 1, overall=None, pass_rate=0.9), row("t01", "text", "critic_off", 1, overall=True, pass_rate=0.5)]
     s = report.condition_summary(rows, "critic_on", None)
