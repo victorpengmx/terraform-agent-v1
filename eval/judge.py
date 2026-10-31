@@ -109,7 +109,8 @@ def judge(model: ModelAdapter, stack: OpStack, prompt: str | None, references: l
           cache: Path | None = CACHE, render: Renderer = render_views, save_renders: Path | None = None) -> dict[str, Any]:
     """Judge a final stack: a cached record if there is one, else one call retried once on an unusable reply.
 
-    Returns {model, key, cached, output, passed, mean, failed, cost_usd, usage}; `passed` is None when both
+    Returns {model, key, cached, output, passed, mean, failed, cost_usd, paid_usd, usage}: cost_usd is what this call
+    spent ($0 on a cache hit), paid_usd what the verdict cost when it was made. `passed` is None when both
     tries failed. Only successful verdicts are cached, so a failure is retried by the next rescore."""
     key = cache_key(stack, prompt, references, model.config.model)
     path = cache / f"{key}.json" if cache is not None else None
@@ -141,7 +142,7 @@ def judge(model: ModelAdapter, stack: OpStack, prompt: str | None, references: l
             break
     else:
         record["failed"] = "; ".join(errors)
-    record |= {"cost_usd": cost, "usage": usage.__dict__.copy(), "errors": errors}
+    record |= {"cost_usd": cost, "paid_usd": cost, "usage": usage.__dict__.copy(), "errors": errors}
     if path is not None and record["output"] is not None:
         path.parent.mkdir(parents=True, exist_ok=True)
         path.write_text(json.dumps({k: v for k, v in record.items() if k not in ("cached", "cost_usd")}, indent=1),

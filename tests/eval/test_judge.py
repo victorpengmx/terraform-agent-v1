@@ -37,6 +37,7 @@ def test_a_verdict_is_parsed_and_cached(tmp_path):
     # Same stack, request and model: served from the cache, no call (the script is empty now).
     again = judging.judge(model, stack(), "a peak", [], cache=tmp_path, render=fake_render)
     assert again["cached"] is True and again["cost_usd"] == 0.0 and again["output"] == rec["output"]
+    assert again["paid_usd"] == rec["cost_usd"] == rec["paid_usd"]  # a rescore keeps what the verdict cost
     # A different request or model is a different key.
     assert judging.cache_key(stack(), "a peak", [], "m") != judging.cache_key(stack(), "two peaks", [], "m")
     assert judging.cache_key(stack(), "a peak", [], "m") != judging.cache_key(stack(), "a peak", [], "n")

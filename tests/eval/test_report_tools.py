@@ -64,6 +64,14 @@ def test_limitations_name_the_family_the_judge_shares(tmp_path):
     assert "shares the critic's model family in 1 runs" in report.render(rows, "x", [tmp_path], KEYS)
 
 
+def test_judge_cost_survives_a_cached_rescore():
+    r = row("t01", "text", "critic_on", 1, overall=True, pass_rate=1.0)
+    r["judge"] |= {"cost_usd": 0.0, "paid_usd": 0.004, "cached": True}  # re-judged from the cache
+    assert report.efficiency([r], "critic_on")["judge_cost"] == 0.004
+    assert report.csv_row(r)["judge_cost_usd"] == 0.004
+    assert report.money(0.0042) == "$0.004" and report.money(12.345) == "$12.35"
+
+
 def test_a_judge_failure_leaves_success_unknown_not_failed(tmp_path):
     rows = [row("t01", "text", "critic_on", 1, overall=None, pass_rate=0.9), row("t01", "text", "critic_off", 1, overall=True, pass_rate=0.5)]
     s = report.condition_summary(rows, "critic_on", None)

@@ -50,6 +50,12 @@ def overall(r: dict[str, Any]) -> bool | None:
     return (r.get("success") or {}).get("overall")
 
 
+def judge_paid(r: dict[str, Any]) -> float | None:
+    """What the run's verdict cost when it was made (a rescore served from the cache spends $0 but keeps this)."""
+    j = r.get("judge") or {}
+    return j.get("paid_usd", j.get("cost_usd"))
+
+
 def pass_rate(r: dict[str, Any]) -> float | None:
     return (r.get("answer_key") or {}).get("pass_rate")
 
@@ -100,7 +106,7 @@ def efficiency(rows: list[dict[str, Any]], cond: str) -> dict[str, Any]:
     successes = sum(overall(r) is True for r in rs)
     costs = [r.get("cost_usd") for r in rs]
     cost_known = all(c is not None for c in costs)
-    judge_costs = [(r.get("judge") or {}).get("cost_usd") or 0.0 for r in rs]
+    judge_costs = [judge_paid(r) or 0.0 for r in rs]
     ts = [r.get("trace_stats") or {} for r in rs]
     tokens = sum(sum(v.values()) for t in ts for v in (t.get("tokens") or {}).values())
     tool_calls = sum(t.get("tool_calls", 0) for t in ts)
@@ -144,7 +150,8 @@ def num(x: float | None, fmt: str = "{:.2f}") -> str:
 
 
 def money(x: float | None) -> str:
-    return "unknown" if x is None else f"${x:.2f}"
+    """Sub-dollar amounts get 3 decimals: a pilot's judge costs $0.003, not $0.00."""
+    return "unknown" if x is None else f"${x:.2f}" if abs(x) >= 1 else f"${x:.3f}"
 
 
 def ci_text(ci: tuple[float, float, float] | None, as_pct: bool) -> str:
@@ -236,7 +243,8 @@ def e5_section(rows: list[dict[str, Any]], keys: dict) -> list[str]:
                          for a, c in q["categories"].items() if c["n"])
         body.append([kind, str(q["runs"]), pct(q["recall"]), pct(q["precision"]), pct(q["relation_recall"]), cats or "n/a"])
     out += table(["prompts", "runs", "feature recall", "precision", "relation recall", "category accuracy (matched features)"], body)
-    return out + ["", "Features match one-to-one on compatible type and overlapping position bands (eval/spec_quality.py).", ""]
+    return out + ["", "Features match one-to-one on compatible type and overlapping position bands (eval/spec_quality.py). "
+                  "Category accuracy counts only categories the answer key states; one the agent left unspecified counts as wrong.", ""]
 
 
 def limitations(rows: list[dict[str, Any]], calibrated: bool) -> list[str]:
@@ -317,7 +325,7 @@ def csv_row(r: dict[str, Any]) -> dict[str, Any]:
         "success_checks": s.get("checks"), "success_judge": s.get("judge"), "pass_rate": a.get("pass_rate"),
         "passed": a.get("passed"), "total": a.get("total"), "major_failures": " ".join(a.get("major_failures") or []),
         "checks_failed": " ".join((r.get("checks") or {}).get("failed") or []), "judge_mean": j.get("mean"),
-        "judge_verdict": (j.get("output") or {}).get("verdict"), "cost_usd": r.get("cost_usd"), "judge_cost_usd": j.get("cost_usd"),
+        "judge_verdict": (j.get("output") or {}).get("verdict"), "cost_usd": r.get("cost_usd"), "judge_cost_usd": judge_paid(r),
         "latency_s": r.get("latency_s"), "steps": t.get("steps"), "tool_calls": t.get("tool_calls"), "tool_errors": t.get("tool_errors"),
         "builder": r["models"]["builder"], "critic": r["models"].get("critic"), "judge": r["models"].get("judge"),
         "judge_same_family": r["models"].get("judge_same_family"),
