@@ -62,29 +62,48 @@ def run_config(config: EvalConfig, run: PlannedRun, suite_dir: Path) -> RunConfi
                      use_spec=cond.use_spec, compare_both_orders=config.compare_both_orders)
 
 
+def condition_roles(config: EvalConfig, condition: str) -> dict[str, str]:
+    """The model each role uses in a condition: builder (and SPEC), critic and comparison when the critic is on."""
+    cond = config.conditions[condition]
+    roles = {"builder": config.models.builder}
+    if cond.use_spec:
+        roles["spec"] = config.models.builder
+    if cond.critic:
+        roles |= {"critic": config.models.critic, "comparison": config.models.critic}
+    return roles
+
+
 def estimate(config: EvalConfig, runs: list[PlannedRun]) -> tuple[str, float | None]:
-    """The cost gate's text and upper bound: each pending run's budget cap plus one judge call per run."""
-    lines, total = [], 0.0
+    """The cost gate's text and upper bound: each pending run's budget cap plus one judge call per run.
+
+    A condition with a model that has no price is "unknown", never $0: the budget cap only counts priced
+    calls, so it can't bound that condition's spend."""
+    lines, known, unknown = [], 0.0, False
     for cond in config.conditions:
         n = sum(r.condition == cond for r in runs)
-        if n:
-            cap = config.budget_for(cond).max_cost_usd
+        if not n:
+            continue
+        cap = config.budget_for(cond).max_cost_usd
+        unpriced = [f"{role} {m}" for role, m in condition_roles(config, cond).items() if not price_known(m)]
+        if unpriced:
+            lines.append(f"  {cond}: {n} runs x ${cap:.2f} cap = unknown (no price for {', '.join(unpriced)}; "
+                         "the cap only counts priced calls)")
+            unknown = True
+        else:
             lines.append(f"  {cond}: {n} runs x ${cap:.2f} cap = ${n * cap:.2f}")
-            total += n * cap
+            known += n * cap
     judge_model = config.judge_model
     per_call = [judging.call_estimate(judge_model, len(r.entry.references)) for r in runs]
     if any(c is None for c in per_call):
-        lines.append(f"  judge: {len(runs)} calls on {judge_model}, cost unknown (no price in agent/models.py)")
-        judge_total = None
-    else:
+        lines.append(f"  judge: {len(runs)} calls on {judge_model} = unknown (no price for judge {judge_model})")
+        unknown = True
+    elif runs:
         judge_total = sum(per_call)  # type: ignore[arg-type]
         lines.append(f"  judge: {len(runs)} calls on {judge_model} = ${judge_total:.2f} (estimate; cached verdicts are free)")
-    for m in (config.models.builder, config.models.critic):
-        if not price_known(m):
-            lines.append(f"  WARNING: no price for {m}: its cost is unknown and the budget cap can't stop it")
-    upper = None if judge_total is None else total + judge_total
-    head = f"{len(runs)} pending runs; estimated cost up to " + ("unknown" if upper is None else f"${upper:.2f}")
-    return "\n".join([head, *lines]), upper
+        known += judge_total
+    upper = None if unknown else known
+    total = f"unknown (priced part up to ${known:.2f})" if unknown else f"${known:.2f}"
+    return "\n".join([f"{len(runs)} pending runs; estimated cost up to {total}", *lines]), upper
 
 
 def run_one(run: PlannedRun, config: EvalConfig, results: Path, suite_dir: Path, make_model: MakeModel,

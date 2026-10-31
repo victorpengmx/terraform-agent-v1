@@ -28,7 +28,8 @@ PRICES: dict[str, dict[str, float | None]] = {
     # TODO(victor): fill in from https://ai.google.dev/gemini-api/docs/pricing (Standard tier).
     # gemini-3.1-pro-preview is priced in two tiers by prompt length; this table holds one rate.
     "gemini-4-argon": {"input": None, "output": None, "cache_read": None},
-    "gemini-3.8-flash": {"input": None, "output": None, "cache_read": None},
+    "gemini-3.8-flash": {"input": None, "output": None, "cache_read": None},  # TODO(victor): the M6 critic
+    "gemini-3.5-flash-lite": {"input": None, "output": None, "cache_read": None},  # TODO(victor)
     "gemini-3.6-flash": {"input": None, "output": None, "cache_read": None},
     "gemini-3.1-pro-preview": {"input": None, "output": None, "cache_read": None},
     # Standard tier, from https://ai.google.dev/gemini-api/docs/pricing (2026-10-31); the M6 eval judge.

@@ -120,6 +120,21 @@ def test_the_cost_gate_spends_nothing_without_yes(tmp_path, monkeypatch, capsys)
     run_eval.main()  # a dry run never spends, even with --yes
 
 
+def test_a_role_without_a_price_makes_its_condition_unknown_never_zero():
+    from eval.config import load_config
+
+    e1 = load_config("eval/configs/e1_critic.yaml")  # critic gemini-3.8-flash: no price yet
+    text, upper = run_eval.estimate(e1, run_eval.plan(e1, ENTRIES))
+    assert upper is None and "$0.00" not in text
+    assert "critic_on: 30 runs x $1.00 cap = unknown (no price for critic gemini-3.8-flash, comparison gemini-3.8-flash" in text
+    assert "critic_off: 30 runs x $0.25 cap = $7.50" in text  # Haiku builder only: priced
+    assert "estimated cost up to unknown (priced part up to $" in text
+    opus = load_config("eval/configs/opus.yaml")  # judge gemini-3.8-flash: no price yet
+    text, upper = run_eval.estimate(opus, run_eval.plan(opus, ENTRIES))
+    assert upper is None and "judge: 15 calls on gemini-3.8-flash = unknown (no price for judge gemini-3.8-flash)" in text
+    assert "critic_on: 15 runs x $3.00 cap = $45.00" in text
+
+
 def test_pairs_share_prompt_and_seed_across_conditions():
     runs = run_eval.plan(config(seeds=[1, 2]), ENTRIES)
     cfgs = {r.key: run_eval.run_config(config(seeds=[1, 2]), r, run_eval.SUITE.parent) for r in runs}

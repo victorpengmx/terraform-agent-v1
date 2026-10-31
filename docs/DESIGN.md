@@ -1030,8 +1030,9 @@ the landform.
   run to `runs.jsonl` (last row per key wins). Re-running skips finished runs and retries errored ones.
 - **Cost gate:** every paid command (run_eval, rescore --judge, regression) prints its estimate first (pending
   runs × their budget cap, plus judge calls × a per-call token estimate at the judge's price) and spends only
-  with `--yes`. E1 is capped at $37.71 (critic_on $1.00, critic_off $0.25 per run), E2 at $20.07; from the
-  token counts of past critic calls an Opus-critic run should cost about $0.60 and a critic_off run $0.03.
+  with `--yes`. Caps: critic_on $1.00, critic_off $0.25 per run. A condition that uses a model without a
+  price (any role) shows "unknown", never $0: the budget cap only counts priced calls, so it can't bound that
+  spend; the total then reads "unknown (priced part up to $X)".
 - **Success** (`eval/scoring.py`) = no failed major answer-key item (matcher mode) AND no failed blocking or
   major programmatic check AND judge pass. Each part is stored; with no usable judge verdict overall success
   is unknown (left out of rates, counted in the report), never a failure. The checklist pass rate (passed /
