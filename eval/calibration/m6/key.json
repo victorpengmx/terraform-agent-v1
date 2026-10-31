@@ -1,0 +1,1214 @@
+{
+ "c01": {
+  "folder": "eval/results/e1_critic",
+  "key": "t05-critic_off-s1",
+  "prompt_id": "t05",
+  "kind": "text",
+  "condition": "critic_off",
+  "judge": {
+   "cached": false,
+   "cost_usd": 0.0240698,
+   "errors": [],
+   "failed": null,
+   "key": "165799308e21958a6e5965eaf877810bc74d8331676a0063fcf0300e64a015de",
+   "mean": 2.3333333333333335,
+   "model": "claude-opus-5-5",
+   "output": {
+    "reasons": [
+     "The mountain range rises as a sheer, uniform stone wall straight out of a nearly flat plain. There is almost no transitional foothill zone, only a thin fringe of grass at its base.",
+     "The foreground is a broad, flat lowland with regular terrace contour stripes. It reads as smooth and synthetic rather than as hilly foothills.",
+     "The river channel is unnatural. A long middle stretch is a wide, dry stone trench with no water, and the river then reappears downstream, so its flow is broken.",
+     "Materials are crude: the mountains are entirely bare grey stone with no snow, gravel or vegetation gradation, and everything else is uniform grass. The channel's stone lining contrasts harshly with the grass around it.",
+     "Block-level geometry is mostly clean, apart from the stepped terrace stripes and the abrupt grass-to-stone edges."
+    ],
+    "scores": {
+     "materials": 2,
+     "minecraft_quality": 3,
+     "naturalism": 2,
+     "reference_match": null
+    },
+    "verdict": "fail"
+   },
+   "paid_usd": 0.0240698,
+   "passed": false,
+   "usage": {
+    "cache_read_tokens": 1194,
+    "cache_write_tokens": 2839,
+    "input_tokens": 4,
+    "output_tokens": 481
+   }
+  }
+ },
+ "c02": {
+  "folder": "eval/results/e1_critic",
+  "key": "t03-critic_off-s1",
+  "prompt_id": "t03",
+  "kind": "text",
+  "condition": "critic_off",
+  "judge": {
+   "cached": false,
+   "cost_usd": 0.0214198,
+   "errors": [],
+   "failed": null,
+   "key": "58b36c0db5a1b2f6064b23293dd3ca4aaea6da009071a29d66a6c845d5c99bb1",
+   "mean": 2.6666666666666665,
+   "model": "claude-opus-5-5",
+   "output": {
+    "reasons": [
+     "Mesas are near-perfect cylinders with flat tops and uniform circular walls, which reads as obviously synthetic rather than eroded buttes.",
+     "The canyon is a long, straight, uniform trench with one sheer stepped wall, and the plain on the other side is flat. It looks like a cut, not a water-carved gorge.",
+     "The creek is thin and mostly clean, but it sits on a narrow ledge and doesn't fill the canyon floor naturally.",
+     "Block-scale is mostly clean: no floating water and few spikes. The terraced wall edges are tidy, though the mesa walls show a fine stair-step noise.",
+     "Materials: terracotta banding suits mesas, but the bands are perfectly horizontal stripes ringing the cylinders. The sand plain is speckled with uniform brown blotches everywhere, including on the mesa tops, which looks like noise patches rather than natural variation."
+    ],
+    "scores": {
+     "materials": 3,
+     "minecraft_quality": 3,
+     "naturalism": 2,
+     "reference_match": null
+    },
+    "verdict": "fail"
+   },
+   "paid_usd": 0.0214198,
+   "passed": false,
+   "usage": {
+    "cache_read_tokens": 1194,
+    "cache_write_tokens": 2825,
+    "input_tokens": 4,
+    "output_tokens": 352
+   }
+  }
+ },
+ "c03": {
+  "folder": "eval/results/e1_critic",
+  "key": "t10-critic_off-s2",
+  "prompt_id": "t10",
+  "kind": "text",
+  "condition": "critic_off",
+  "judge": {
+   "cached": false,
+   "cost_usd": 0.0214398,
+   "errors": [],
+   "failed": null,
+   "key": "0af52b761767b8ec9b584adf03d359b4325fcca37d25b8980fb6b2086642022e",
+   "mean": 1.6666666666666667,
+   "model": "claude-opus-5-5",
+   "output": {
+    "reasons": [
+     "The two peaks are smooth, symmetric cones of uniform stone, which reads as synthetic rather than eroded mountains.",
+     "The valley is a flat green floor bounded by ruler-straight stone terraced walls running diagonally across the map, so it looks engineered, not glacial.",
+     "The stream is a short, isolated rectangular water strip sitting on the flat floor and does not run to the south edge. A separate straight sandstone-walled trench cuts through the plateau, ending at a gap in the map edge.",
+     "Block-scale issues: the sandstone trench has jagged sawtooth walls, the stream is a disconnected box, and the valley sides are stepped in regular contour bands.",
+     "Materials are plain stone cones with a flat grass floor; the patchy grass and stone on the plateaus is noisy, and the sandstone banding looks out of place for an alpine glacial valley. There is no snow or scree."
+    ],
+    "scores": {
+     "materials": 2,
+     "minecraft_quality": 2,
+     "naturalism": 1,
+     "reference_match": null
+    },
+    "verdict": "fail"
+   },
+   "paid_usd": 0.0214398,
+   "passed": false,
+   "usage": {
+    "cache_read_tokens": 1194,
+    "cache_write_tokens": 2833,
+    "input_tokens": 4,
+    "output_tokens": 351
+   }
+  }
+ },
+ "c04": {
+  "folder": "eval/results/e2_spec",
+  "key": "t02-spec_off-s2",
+  "prompt_id": "t02",
+  "kind": "text",
+  "condition": "spec_off",
+  "judge": {
+   "cached": false,
+   "cost_usd": 0.020849799999999998,
+   "errors": [],
+   "failed": null,
+   "key": "be6d67db543defc9a030f9ee29ef2fcc6ae6a71b2b2437778de2cb681702d795",
+   "mean": 3.3333333333333335,
+   "model": "claude-opus-5-5",
+   "output": {
+    "reasons": [
+     "A single broad stratovolcano rising from the sea with a small summit crater holding water reads correctly for the request. The cone is fairly regular and smooth, but irregular rim notches and coastal benches keep it from looking like a perfect geometric cone.",
+     "The flanks show large blobby camouflage-like patches of dark and grey stone. They read as noise-mask patches rather than lava flows or erosion gullies, which hurts naturalism and materials.",
+     "The crater lake is small but cleanly contained within the rim. Terracing is smooth and there are no visible spikes, pillars or floating water.",
+     "Grass and dirt patches on the lower slopes and rim, plus a sand beach ring, are plausible. The beach is a thin uniform ring, and the dirt outlines around the grass look artificial.",
+     "The seafloor is mottled but acceptable."
+    ],
+    "scores": {
+     "materials": 3,
+     "minecraft_quality": 4,
+     "naturalism": 3,
+     "reference_match": null
+    },
+    "verdict": "pass"
+   },
+   "paid_usd": 0.020849799999999998,
+   "passed": true,
+   "usage": {
+    "cache_read_tokens": 1194,
+    "cache_write_tokens": 2799,
+    "input_tokens": 4,
+    "output_tokens": 330
+   }
+  }
+ },
+ "c05": {
+  "folder": "eval/results/e2_spec",
+  "key": "i01-spec_off-s1",
+  "prompt_id": "i01",
+  "kind": "image",
+  "condition": "spec_off",
+  "judge": {
+   "cached": false,
+   "cost_usd": 0.0299298,
+   "errors": [],
+   "failed": null,
+   "key": "cfb93ff9dbaed59329095747955a5fd24094b06101c96728dd0ca323b478ae45",
+   "mean": 3.0,
+   "model": "claude-opus-5-5",
+   "output": {
+    "reasons": [
+     "Two peaks flanking a central V-shaped valley that opens north mirrors the reference's arrangement: a peak on the left, a range on the right, and a valley between them. The foreground meadow slope is also present.",
+     "Peaks are fairly smooth cones with large, uniform stone faces. The southern edge shows two symmetric scooped valleys, which reads somewhat synthetic, but the overall forms are plausible.",
+     "Block-scale cleanliness is decent. There are no floating water or spike artifacts. Some stone patches show striated diagonal streaks, and the snow blobs are blocky.",
+     "The palette suits the scene: grass meadows, gray stone cliffs and snow caps. However, the brown dirt/podzol patches are scattered as random blobs. A large snow patch on the low southern ridge (visible in overview_ne) is implausible at that elevation, while the peaks carry little snow compared with the reference's prominent snowfields.",
+     "There are no forests or tree cover, so the darker conifer slopes of the reference are absent. Mood and proportions are roughly similar, but the peaks are less craggy than the reference."
+    ],
+    "scores": {
+     "materials": 3,
+     "minecraft_quality": 3,
+     "naturalism": 3,
+     "reference_match": 3
+    },
+    "verdict": "pass"
+   },
+   "paid_usd": 0.0299298,
+   "passed": true,
+   "usage": {
+    "cache_read_tokens": 1194,
+    "cache_write_tokens": 4247,
+    "input_tokens": 4,
+    "output_tokens": 422
+   }
+  }
+ },
+ "c06": {
+  "folder": "eval/results/e1_critic",
+  "key": "t09-critic_on-s1",
+  "prompt_id": "t09",
+  "kind": "text",
+  "condition": "critic_on",
+  "judge": {
+   "cached": false,
+   "cost_usd": 0.0209348,
+   "errors": [],
+   "failed": null,
+   "key": "938dfdf334e11a193978fbaf7dd5f907bdd1dcfe697d8ff151547758611cdea2",
+   "mean": 2.6666666666666665,
+   "model": "claude-opus-5-5",
+   "output": {
+    "reasons": [
+     "The lake is a rounded, near-square basin with uniform gravel rims. It reads as synthetic rather than a natural glacial lake.",
+     "The hills are smooth concentric domes with stepped contour terracing, similar in size and evenly spaced at the corners. They look artificial.",
+     "The mountains form a single wall-like ridge with a near-vertical north edge running straight across the map, so they lack natural massing.",
+     "The river is a thin, broken trickle of water down the mountain face. It looks like sparse disconnected blocks, possibly floating, rather than a carved channel.",
+     "Materials are a flat grass plain, bare grey stone hills patches, and an abrupt switch from stone to a snow band. The palette is plausible for the request but blocky and banded.",
+     "The block surface is mostly clean, but the river artifacts and terraced rings hurt quality."
+    ],
+    "scores": {
+     "materials": 3,
+     "minecraft_quality": 3,
+     "naturalism": 2,
+     "reference_match": null
+    },
+    "verdict": "fail"
+   },
+   "paid_usd": 0.0209348,
+   "passed": false,
+   "usage": {
+    "cache_read_tokens": 1194,
+    "cache_write_tokens": 2816,
+    "input_tokens": 4,
+    "output_tokens": 330
+   }
+  }
+ },
+ "c07": {
+  "folder": "eval/results/e1_critic",
+  "key": "i05-critic_off-s1",
+  "prompt_id": "i05",
+  "kind": "image",
+  "condition": "critic_off",
+  "judge": {
+   "cached": false,
+   "cost_usd": 0.043089800000000004,
+   "errors": [],
+   "failed": null,
+   "key": "c365118e9bfedafc72a385075dd63a7cd729f27b7b125ba46551d7b795a7b7aa",
+   "mean": 2.0,
+   "model": "claude-opus-5-5",
+   "output": {
+    "reasons": [
+     "Mountain wall is a near-vertical gray stone cliff rising abruptly from flat grassland along a straight line; reads as a synthetic wall rather than the gradual green foothills rising into the range in the photo",
+     "Packed/blue ice block occupies a sharp rectangular region on the right peak with ruler-straight edges, an obvious artifact",
+     "Foreground hill is a concentric-ring cone with perfectly regular terraces; small isolated stone cone and a crater-like pit look artificial",
+     "Snow caps are uniform white with hard horizontal snowline; stone flanks uniformly gray with no grass transition, unlike the photo's mixed snow/rock and grassy slopes",
+     "Grassland has random circular dirt blotches rather than natural variation; no trees or cherry blossoms",
+     "Overall arrangement (snowy range behind, grassy hills in front) loosely matches, but proportions and mood are off"
+    ],
+    "scores": {
+     "materials": 2,
+     "minecraft_quality": 2,
+     "naturalism": 2,
+     "reference_match": 2
+    },
+    "verdict": "fail"
+   },
+   "paid_usd": 0.043089800000000004,
+   "passed": false,
+   "usage": {
+    "cache_read_tokens": 1194,
+    "cache_write_tokens": 7151,
+    "input_tokens": 4,
+    "output_tokens": 354
+   }
+  }
+ },
+ "c08": {
+  "folder": "eval/results/e1_critic",
+  "key": "i04-critic_on-s1",
+  "prompt_id": "i04",
+  "kind": "image",
+  "condition": "critic_on",
+  "judge": {
+   "cached": false,
+   "cost_usd": 0.0334348,
+   "errors": [],
+   "failed": null,
+   "key": "2bdd3120d1579d500f1623a712ba2f520a250d262248b2115de3b953e72d7b44",
+   "mean": 2.5,
+   "model": "claude-opus-5-5",
+   "output": {
+    "reasons": [
+     "Two large mesas with a thin spire between them sit behind a meandering river, so the overall arrangement echoes the photo. The right mesa is bigger and the left one smaller, though the left one in the photo is more of a craggy butte.",
+     "The mesas are blob-shaped flat-topped drums with smooth, nearly vertical walls. They lack the talus/scree skirts, cliff-and-slope profile and crenellated tops seen in the reference. The spire is a symmetric cone.",
+     "The desert floor is almost perfectly flat with faint terrace lines, missing the rolling washes and mounds of the photo. The river is a uniform-width channel cut into the flat plain with even banks.",
+     "Block quality is mostly clean: no floating water or spikes. There are a few odd single-block posts along the river bank.",
+     "Materials: the terracotta banding on the walls reads well, but the stripes are perfectly horizontal rings. The flat tops reuse the floor material, and the floor shows a repetitive orange/sand blob pattern with outlined rings that looks synthetic. There is no vegetation or scrub tones like the photo's sage dots.",
+     "Palette and mood (red/orange desert, blue sky) match moderately."
+    ],
+    "scores": {
+     "materials": 2,
+     "minecraft_quality": 3,
+     "naturalism": 2,
+     "reference_match": 3
+    },
+    "verdict": "fail"
+   },
+   "paid_usd": 0.0334348,
+   "passed": false,
+   "usage": {
+    "cache_read_tokens": 1194,
+    "cache_write_tokens": 4836,
+    "input_tokens": 4,
+    "output_tokens": 450
+   }
+  }
+ },
+ "c09": {
+  "folder": "eval/results/e1_critic",
+  "key": "i05-critic_on-s2",
+  "prompt_id": "i05",
+  "kind": "image",
+  "condition": "critic_on",
+  "judge": {
+   "cached": false,
+   "cost_usd": 0.0433698,
+   "errors": [],
+   "failed": null,
+   "key": "dabf5c99cddb7abece8bc0a8ed6917ad9bee846bfb51c3b2b793272afae7be1c",
+   "mean": 2.25,
+   "model": "claude-opus-5-5",
+   "output": {
+    "reasons": [
+     "Reference: rolling terraced grass foreground, mid-slope with dirt patches and cherry trees, a jagged snowy multi-peak range behind with snow and stone mixed throughout.",
+     "Render: grassy foreground and dirt-patched mid-slope match, but the snow lies on a flat-ish shelf below two huge smooth grey stone cones. That reverses the reference, where snow covers the peaks.",
+     "The two main peaks are large, smooth, conical stone masses with almost no snow. They look synthetic next to the craggy, snow-capped ridgeline in the photo.",
+     "The snow zone forms a horizontal band with blobby stone patches, and the sharp boundary between snow and grass reads as artificial layering.",
+     "Block-scale geometry is mostly clean, with only minor spikes at the summits.",
+     "Materials: bare stone walls on the peaks and abrupt bands of grass, snow, grass and stone. The foreground has no trees at all."
+    ],
+    "scores": {
+     "materials": 2,
+     "minecraft_quality": 3,
+     "naturalism": 2,
+     "reference_match": 2
+    },
+    "verdict": "fail"
+   },
+   "paid_usd": 0.0433698,
+   "passed": false,
+   "usage": {
+    "cache_read_tokens": 1194,
+    "cache_write_tokens": 7151,
+    "input_tokens": 4,
+    "output_tokens": 368
+   }
+  }
+ },
+ "c10": {
+  "folder": "eval/results/e1_critic",
+  "key": "t08-critic_on-s1",
+  "prompt_id": "t08",
+  "kind": "text",
+  "condition": "critic_on",
+  "judge": {
+   "cached": false,
+   "cost_usd": 0.0269298,
+   "errors": [],
+   "failed": null,
+   "key": "b0639873eb688b3ce2b7ccc66a99587e25af6d86db033feb79de7a75ee92648b",
+   "mean": 2.3333333333333335,
+   "model": "claude-opus-5-5",
+   "output": {
+    "reasons": [
+     "The 'canyon' reads mostly as a single curving escarpment: a high block to the north drops to a lower surface to the south, rather than a narrow gorge cut into one continuous plateau.",
+     "The canyon floor is barely visible. The river shows only as short, disconnected blue slivers in a few pockets at the cliff base, not as a continuous thin river running out of the south edge.",
+     "The walls are sheer as requested, but they are very uniform and smooth-curved, with evenly spaced terracotta bands that look artificial.",
+     "Block-scale surfaces are mostly clean, with terraced contour steps on the plateau and no obvious floating water or spikes. The wall faces are slightly noisy and the river pockets look like holes.",
+     "The surface is almost entirely gray stone/gravel tones with dull patches. The repeating red/gray stripes on the cliffs read as rings, and there is no vegetation or variation suited to a plateau.",
+     "Overall it is not a convincing deep winding canyon with a river."
+    ],
+    "scores": {
+     "materials": 2,
+     "minecraft_quality": 3,
+     "naturalism": 2,
+     "reference_match": null
+    },
+    "verdict": "fail"
+   },
+   "paid_usd": 0.0269298,
+   "passed": false,
+   "usage": {
+    "cache_read_tokens": 1194,
+    "cache_write_tokens": 2831,
+    "input_tokens": 4,
+    "output_tokens": 626
+   }
+  }
+ },
+ "c11": {
+  "folder": "eval/results/e2_spec",
+  "key": "t01-spec_off-s2",
+  "prompt_id": "t01",
+  "kind": "text",
+  "condition": "spec_off",
+  "judge": {
+   "cached": false,
+   "cost_usd": 0.020734799999999998,
+   "errors": [],
+   "failed": null,
+   "key": "2338d0c596e158363af20300bca966ed8845325246985ed65d7de3bcfd0078d2",
+   "mean": 3.0,
+   "model": "claude-opus-5-5",
+   "output": {
+    "reasons": [
+     "The valley reads well: a broad grassy floor between two ranges, with the western range clearly taller and more rugged. The river meanders believably with sand banks.",
+     "The lake is set in an oddly circular, steep bowl, and its water surface bulges and tilts toward the map edge. It looks like a filled crater, not a natural lake.",
+     "The western mountain faces are very steep, near-vertical stone walls with a striated, sheared look. Some ridges are serrated and spiky.",
+     "Materials are plausible but patchy: stone and grass blotches with scattered dirt spots, uniform grass on the valley floor, and sand bands along the river. There are no gravel or snow accents on the high peaks.",
+     "Dark stone patches line the riverbank in places. Overall there are some artifacts, but the terrain is mostly coherent."
+    ],
+    "scores": {
+     "materials": 3,
+     "minecraft_quality": 3,
+     "naturalism": 3,
+     "reference_match": null
+    },
+    "verdict": "pass"
+   },
+   "paid_usd": 0.020734799999999998,
+   "passed": true,
+   "usage": {
+    "cache_read_tokens": 1194,
+    "cache_write_tokens": 2816,
+    "input_tokens": 4,
+    "output_tokens": 320
+   }
+  }
+ },
+ "c12": {
+  "folder": "eval/results/e1_critic",
+  "key": "t01-critic_off-s1",
+  "prompt_id": "t01",
+  "kind": "text",
+  "condition": "critic_off",
+  "judge": {
+   "cached": false,
+   "cost_usd": 0.026086,
+   "errors": [],
+   "failed": null,
+   "key": "5cb3a4a307189612d81da73f62e5809dfc8d1907ec529eb2e9158c02e9d07a8e",
+   "mean": 3.6666666666666665,
+   "model": "claude-opus-5-5",
+   "output": {
+    "reasons": [
+     "A broad grassy valley sits between two massifs, and the larger western mountain reads convincingly. Ridges and scree-like stone patches give the slopes natural relief.",
+     "The river meanders believably down the valley and widens into a rounded lake with sandy shores. The lake's outline is a little too blobby and regular.",
+     "At block scale the river is sometimes slightly incised, with dark stone banks, but there is no floating water and no spikes. The steep slopes show terracing steps but are mostly clean.",
+     "Materials are a mix of grass, dirt patches and stone on the steeper areas, with sand along the water. The scattered dirt specks look a bit noisy and uniform across the whole map, and the stone patches have hard edges, but overall the palette is plausible."
+    ],
+    "scores": {
+     "materials": 3,
+     "minecraft_quality": 4,
+     "naturalism": 4,
+     "reference_match": null
+    },
+    "verdict": "pass"
+   },
+   "paid_usd": 0.026086,
+   "passed": true,
+   "usage": {
+    "cache_read_tokens": 0,
+    "cache_write_tokens": 4010,
+    "input_tokens": 4,
+    "output_tokens": 301
+   }
+  }
+ },
+ "c13": {
+  "folder": "eval/results/e1_critic",
+  "key": "i01-critic_off-s2",
+  "prompt_id": "i01",
+  "kind": "image",
+  "condition": "critic_off",
+  "judge": {
+   "cached": false,
+   "cost_usd": 0.0296098,
+   "errors": [],
+   "failed": null,
+   "key": "5cf3ca1bcf338127c6f5838d12991361a55ed339ef62d82696bef82e8f56239d",
+   "mean": 2.25,
+   "model": "claude-opus-5-5",
+   "output": {
+    "reasons": [
+     "Two peaks flank a central valley, roughly matching the photo's left peak, right snowy range and valley between them. The foreground, though, is a flat green plateau with a central dip. It lacks the photo's sloping alpine meadow and forested hillsides.",
+     "The peaks are smooth, near-perfect pyramidal cones with uniform faces. They lack ridges, cliffs or erosion detail and look synthetic.",
+     "Large areas of flat, featureless plain fill both sides of the foreground.",
+     "Block-scale geometry is mostly clean, with no floating water or spikes. The mountain faces show long regular terracing steps.",
+     "Materials are weak. Mountains are uniform stone with almost no snow, while the photo has prominent snowcaps. There are no trees, though the photo has dense conifers.",
+     "The grass is covered in repetitive brown coarse-dirt rings and blobs scattered uniformly everywhere, which looks noisy and artificial.",
+     "The palette and mood only partially match the photo: no snow, no forest, and a grey/olive look instead of lush green and white."
+    ],
+    "scores": {
+     "materials": 2,
+     "minecraft_quality": 3,
+     "naturalism": 2,
+     "reference_match": 2
+    },
+    "verdict": "fail"
+   },
+   "paid_usd": 0.0296098,
+   "passed": false,
+   "usage": {
+    "cache_read_tokens": 1194,
+    "cache_write_tokens": 4247,
+    "input_tokens": 4,
+    "output_tokens": 406
+   }
+  }
+ },
+ "c14": {
+  "folder": "eval/results/e2_spec",
+  "key": "i02-spec_off-s2",
+  "prompt_id": "i02",
+  "kind": "image",
+  "condition": "spec_off",
+  "judge": {
+   "cached": false,
+   "cost_usd": 0.0494198,
+   "errors": [],
+   "failed": null,
+   "key": "9ff40cea5198b616351e3244417dfb2949d1c630044bedfdcada3c52a1f13af7",
+   "mean": 2.25,
+   "model": "claude-opus-5-5",
+   "output": {
+    "reasons": [
+     "Single isolated conical peak with a snow cap, not the broad massifs separating two fjord arms in the photo. The mountain reads as a synthetic cone with radial stripes of stone and dirt.",
+     "The 'river' from the lake is mostly a dry gray stone ditch wrapping around the mountain base, with only small water patches. It reads as an artificial channel rather than a flowing river.",
+     "The fjord is a curved trench of water that ends abruptly at the map edge. It has no surrounding steep mountain walls, and the foreground is flat grassland.",
+     "Materials: grass is speckled uniformly with dirt blotches everywhere. The snow cap is blocky with vertical white walls, and rock patches are blobby gray. There is little forest-green or cliff variety compared with the photo.",
+     "Minecraft quality: a stepped snow column on the peak, dark gravel-like pocks along the shores, and a stray sand block at the front edge; otherwise mostly coherent.",
+     "Reference: the lake on the left and the fjord on the right are loosely present. However, the dominant snowy ridges, scale, and fjord-in-deep-valley mood are missing."
+    ],
+    "scores": {
+     "materials": 2,
+     "minecraft_quality": 3,
+     "naturalism": 2,
+     "reference_match": 2
+    },
+    "verdict": "fail"
+   },
+   "paid_usd": 0.0494198,
+   "passed": false,
+   "usage": {
+    "cache_read_tokens": 1194,
+    "cache_write_tokens": 8065,
+    "input_tokens": 4,
+    "output_tokens": 442
+   }
+  }
+ },
+ "c15": {
+  "folder": "eval/results/e1_critic",
+  "key": "i02-critic_on-s2",
+  "prompt_id": "i02",
+  "kind": "image",
+  "condition": "critic_on",
+  "judge": {
+   "cached": false,
+   "cost_usd": 0.0487398,
+   "errors": [],
+   "failed": null,
+   "key": "99f7c7e10922c533955abab0f9d3c76310d9e6b04a047daa2746c5c714a46e3e",
+   "mean": 2.0,
+   "model": "claude-opus-5-5",
+   "output": {
+    "reasons": [
+     "Central mountain is a near-perfect smooth cone with a hard snow cap boundary, which looks obviously synthetic.",
+     "A ruler-straight diagonal channel and gray wall cut runs from the mountain to the fjord, reading as engineered rather than eroded.",
+     "The fjord is a short rectangular basin ending abruptly at the map edge with flat-shaded straight stone walls and terraced banding.",
+     "The south foreground has a flat circular mound with concentric ring terraces, another synthetic shape.",
+     "Block-scale stepping is mostly clean, but the large flat stone faces and sharp snow and stone boundaries look artificial.",
+     "Materials are grass with blotchy dirt patches, bare gray stone walls, and a solid white snow cone. The abrupt switches lack the forest-green slopes of the photo.",
+     "Compared with the photo, the layout loosely echoes it, with a lake on the left, a central mountain and the fjord at right. But the fjord is tiny and distant rather than a broad foreground water body, the foreground is dull grassland, and the mood does not match."
+    ],
+    "scores": {
+     "materials": 2,
+     "minecraft_quality": 3,
+     "naturalism": 1,
+     "reference_match": 2
+    },
+    "verdict": "fail"
+   },
+   "paid_usd": 0.0487398,
+   "passed": false,
+   "usage": {
+    "cache_read_tokens": 1194,
+    "cache_write_tokens": 8065,
+    "input_tokens": 4,
+    "output_tokens": 408
+   }
+  }
+ },
+ "c16": {
+  "folder": "eval/results/e1_critic",
+  "key": "i01-critic_off-s1",
+  "prompt_id": "i01",
+  "kind": "image",
+  "condition": "critic_off",
+  "judge": {
+   "cached": false,
+   "cost_usd": 0.0286698,
+   "errors": [],
+   "failed": null,
+   "key": "47f17a13e5fe1ae516ff16a3f3286c65b4be39963abf5f32b7dd7dbdadcdb719",
+   "mean": 3.25,
+   "model": "claude-opus-5-5",
+   "output": {
+    "reasons": [
+     "Overview_s matches the photo's layout: a grassy foreground slope, a valley running north, a peak on the left and a larger massif on the right. Proportions are reasonable, though the far peaks are less dramatic.",
+     "There is no snow on the peaks, and the photo's distant snowy range and its forest bands are missing. The palette is only grass, dirt and stone, so the snow-capped alpine mood is weakened.",
+     "The foreground meadow is covered in evenly scattered dirt patches, which read as noise rather than natural variation.",
+     "The stone patches on the right slopes look like blobs, including a large flat grey patch on a gentle grass slope. Rock is not following steepness convincingly.",
+     "Geology is plausible: the valley, ridges and cliff faces read naturally, and the terracing is mostly smooth.",
+     "Block-scale is clean overall, with only minor stepped artifacts on the steep cliffs. There are no floating features."
+    ],
+    "scores": {
+     "materials": 3,
+     "minecraft_quality": 4,
+     "naturalism": 3,
+     "reference_match": 3
+    },
+    "verdict": "pass"
+   },
+   "paid_usd": 0.0286698,
+   "passed": true,
+   "usage": {
+    "cache_read_tokens": 1194,
+    "cache_write_tokens": 4247,
+    "input_tokens": 4,
+    "output_tokens": 359
+   }
+  }
+ },
+ "c17": {
+  "folder": "eval/results/e2_spec",
+  "key": "t06-spec_off-s2",
+  "prompt_id": "t06",
+  "kind": "text",
+  "condition": "spec_off",
+  "judge": {
+   "cached": false,
+   "cost_usd": 0.021674799999999998,
+   "errors": [],
+   "failed": null,
+   "key": "128e6f16ce08e598da9f0d8be90c0858cd03964194a4fc77e6599c8d5e3aea06",
+   "mean": 2.6666666666666665,
+   "model": "claude-opus-5-5",
+   "output": {
+    "reasons": [
+     "The ridge reads as a massive steep rock wall with a ragged crest and some gullies. It is a plausible mountain, though less of a thin knife-edge than requested.",
+     "The river is ruler-straight as the request asked, but it sits in a uniform trench with perfectly parallel banks. It looks engineered, and its edge striping of sand, gravel, stone and dark blocks is regular and artificial.",
+     "The eastern hills are smooth concentric rounded mounds with visible terracing contour rings, which look somewhat procedural but acceptable.",
+     "Block-level quality is mostly clean: no floating water or obvious spikes. There are tall bare stone walls, and a small boxy stone outcrop at the ridge foot.",
+     "Materials: grass with scattered dirt specks everywhere is speckled and uniform. The ridge is almost entirely bare stone with little transition. The stone patches on the hills look like blobs, and the river banks are banded."
+    ],
+    "scores": {
+     "materials": 2,
+     "minecraft_quality": 3,
+     "naturalism": 3,
+     "reference_match": null
+    },
+    "verdict": "fail"
+   },
+   "paid_usd": 0.021674799999999998,
+   "passed": false,
+   "usage": {
+    "cache_read_tokens": 1194,
+    "cache_write_tokens": 2836,
+    "input_tokens": 4,
+    "output_tokens": 362
+   }
+  }
+ },
+ "c18": {
+  "folder": "eval/results/e2_spec",
+  "key": "t05-spec_off-s2",
+  "prompt_id": "t05",
+  "kind": "text",
+  "condition": "spec_off",
+  "judge": {
+   "cached": false,
+   "cost_usd": 0.0212098,
+   "errors": [],
+   "failed": null,
+   "key": "d833e6eec0f8c5c32d37935b0d2e3139efd2883d331d49c369dd2ef63ce4a23b",
+   "mean": 3.0,
+   "model": "claude-opus-5-5",
+   "output": {
+    "reasons": [
+     "Mountain range along the back with a tall central spire, foothills in front, and a river cut down to the south edge. The overall layout reads plausibly.",
+     "The tallest peak is a fairly regular, steep cone-like spike. The foothill plain has terraced contour lines and looks generic and smooth.",
+     "The river sits in a narrow, deep slot canyon with near-vertical stone walls. That reads more as carved than eroded, but its course meanders naturally.",
+     "Block-level detail is mostly clean. There are a few dark/black blocks in the canyon, odd sand bits, and some stepped waterfall segments. The water seems contained, with no major floating artifacts.",
+     "Materials: stone on steep faces and grass on gentle ground is reasonable. The scattered dirt speckle pattern is uniform and noisy, and the canyon walls are bare stone. Still plausible."
+    ],
+    "scores": {
+     "materials": 3,
+     "minecraft_quality": 3,
+     "naturalism": 3,
+     "reference_match": null
+    },
+    "verdict": "pass"
+   },
+   "paid_usd": 0.0212098,
+   "passed": true,
+   "usage": {
+    "cache_read_tokens": 1194,
+    "cache_write_tokens": 2839,
+    "input_tokens": 4,
+    "output_tokens": 338
+   }
+  }
+ },
+ "c19": {
+  "folder": "eval/results/e1_critic",
+  "key": "i01-critic_on-s2",
+  "prompt_id": "i01",
+  "kind": "image",
+  "condition": "critic_on",
+  "judge": {
+   "cached": false,
+   "cost_usd": 0.0288298,
+   "errors": [],
+   "failed": null,
+   "key": "d6bbc77e785733659c0c9d1e20843f944fc2a97eb8122bbdf858421841d1dc90",
+   "mean": 3.0,
+   "model": "claude-opus-5-5",
+   "output": {
+    "reasons": [
+     "overview_s matches the photo's layout: a big snow-capped peak on the left, a second snowy ridge on the right, a valley notch between them, and a green alpine meadow in the foreground.",
+     "Mountains are smooth, near-conical masses with uniform grey stone flanks. They lack the craggy ridges, gullies and layered cliffs of the photo. The left peak reads as a synthetic cone.",
+     "The meadow foreground is plausible, gently rolling with contour terracing.",
+     "Block level is mostly clean. The NE view shows some odd snow lumps on the steep edge ridges and blocky protrusions, but there are no floating artifacts.",
+     "Materials: green grass, brown dirt patches and grey stone with snow caps follow the photo's palette. However, the stone faces are bare and uniform, the snow line is a hard horizontal cut, and the photo's forest cover on the lower slopes is missing.",
+     "Overall it is acceptable but not polished."
+    ],
+    "scores": {
+     "materials": 3,
+     "minecraft_quality": 3,
+     "naturalism": 3,
+     "reference_match": 3
+    },
+    "verdict": "pass"
+   },
+   "paid_usd": 0.0288298,
+   "passed": true,
+   "usage": {
+    "cache_read_tokens": 1194,
+    "cache_write_tokens": 4247,
+    "input_tokens": 4,
+    "output_tokens": 367
+   }
+  }
+ },
+ "c20": {
+  "folder": "eval/results/e2_spec",
+  "key": "t03-spec_off-s1",
+  "prompt_id": "t03",
+  "kind": "text",
+  "condition": "spec_off",
+  "judge": {
+   "cached": false,
+   "cost_usd": 0.0210398,
+   "errors": [],
+   "failed": null,
+   "key": "bdcca2183537b6b64ead4dc0c15b0b510eb62f11ca4707a48a851d1940e9ba57",
+   "mean": 2.6666666666666665,
+   "model": "claude-opus-5-5",
+   "output": {
+    "reasons": [
+     "Mesas have sheer, banded terracotta walls and flat caps, so the desert mesa character reads clearly.",
+     "The mesas look like extruded blobs with perfectly vertical sides and uniform height, more stamped than eroded. There is no talus or scree at their bases.",
+     "The canyon is an odd raised, layered ridge-like trough that runs diagonally. It reads as a straight synthetic band rather than a carved canyon, and the creek appears only as a short blue sliver at the edges.",
+     "The flat plain has artifact contour lines and large uniform patches. Sand-colored streaks run down the mesa walls like smeared fill.",
+     "Materials are thematically right: red, orange and brown terracotta bands with sand caps. But the mottled sand/orange noise on every flat surface looks like camouflage, and the wall banding is perfectly uniform."
+    ],
+    "scores": {
+     "materials": 3,
+     "minecraft_quality": 3,
+     "naturalism": 2,
+     "reference_match": null
+    },
+    "verdict": "fail"
+   },
+   "paid_usd": 0.0210398,
+   "passed": false,
+   "usage": {
+    "cache_read_tokens": 1194,
+    "cache_write_tokens": 2825,
+    "input_tokens": 4,
+    "output_tokens": 333
+   }
+  }
+ },
+ "c21": {
+  "folder": "eval/results/e1_critic",
+  "key": "t04-critic_on-s2",
+  "prompt_id": "t04",
+  "kind": "text",
+  "condition": "critic_on",
+  "judge": {
+   "cached": false,
+   "cost_usd": 0.0209198,
+   "errors": [],
+   "failed": null,
+   "key": "4ff3e9f203145756d518e1150b34a97e1aa840a1b3abd970d69ca9e53daf4162",
+   "mean": 3.0,
+   "model": "claude-opus-5-5",
+   "output": {
+    "reasons": [
+     "Gentle rolling terrain with smooth contour terracing reads as natural lowland; the low ridge rises along the north edge as requested.",
+     "River meanders convincingly, but the channel looks carved: steep stone and sand walls sit along an otherwise flat-floored, uniform-width cut. The upstream end climbs the ridge in a narrow stepped gorge.",
+     "Block-scale is mostly clean. There are no floating water or spikes. Some steep gray cliff faces along the river bends are slightly harsh, and the water appears to step down in places.",
+     "Materials are plausible: grass with scattered dirt patches, and sand and gravel banks with stone at the cut faces. The dirt speckle is uniform noise, and the stone walls are a bit abrupt for gentle hills.",
+     "Overall an acceptable pastoral landscape that matches the request."
+    ],
+    "scores": {
+     "materials": 3,
+     "minecraft_quality": 3,
+     "naturalism": 3,
+     "reference_match": null
+    },
+    "verdict": "pass"
+   },
+   "paid_usd": 0.0209198,
+   "passed": true,
+   "usage": {
+    "cache_read_tokens": 1194,
+    "cache_write_tokens": 2805,
+    "input_tokens": 4,
+    "output_tokens": 332
+   }
+  }
+ },
+ "c22": {
+  "folder": "eval/results/e1_critic",
+  "key": "i05-critic_off-s2",
+  "prompt_id": "i05",
+  "kind": "image",
+  "condition": "critic_off",
+  "judge": {
+   "cached": false,
+   "cost_usd": 0.0455498,
+   "errors": [],
+   "failed": null,
+   "key": "351e60b1a6a6f1766414ba615440f54999ab17578cedd0a014baa67f0ed5c7dc",
+   "mean": 2.25,
+   "model": "claude-opus-5-5",
+   "output": {
+    "reasons": [
+     "The reference shows a jagged snowy range behind rolling grassy terraced hills with cherry trees and an oak grove in front. The render has the same general layout: mountains at the back (north), a hill in the middle and a grassy plain in front.",
+     "Naturalism: the mountains rise as huge smooth walls with a flat, straight snow line. One peak is a near-perfect cone and the map edge is cut sheer. The central hill has a crescent-shaped stone band wrapped around it like an artificial ring. The foreground plain is very flat. Overall it reads as synthetic.",
+     "Minecraft quality: the block surfaces are mostly clean with no floating water. However, the mountain faces are monotonous stair-stepped stone walls and the snow caps sit on them abruptly.",
+     "Materials: a hard horizontal boundary splits the stone from the snow. The grass is speckled with uniform dirt patches. The stone crescent ring is a single-block stripe. There are no trees, flowers or cherry blossoms. The mountain lacks the mixed stone/snow texture of the reference.",
+     "Reference match: the near/far arrangement is roughly right, but the reference's jagged multi-peak skyline becomes two smooth lumps and a cone. The lush tree cover is missing, so the mood differs."
+    ],
+    "scores": {
+     "materials": 2,
+     "minecraft_quality": 3,
+     "naturalism": 2,
+     "reference_match": 2
+    },
+    "verdict": "fail"
+   },
+   "paid_usd": 0.0455498,
+   "passed": false,
+   "usage": {
+    "cache_read_tokens": 1194,
+    "cache_write_tokens": 7151,
+    "input_tokens": 4,
+    "output_tokens": 477
+   }
+  }
+ },
+ "c23": {
+  "folder": "eval/results/e1_critic",
+  "key": "t06-critic_on-s1",
+  "prompt_id": "t06",
+  "kind": "text",
+  "condition": "critic_on",
+  "judge": {
+   "cached": false,
+   "cost_usd": 0.0212748,
+   "errors": [],
+   "failed": null,
+   "key": "1da46259925fed1b3a9f86e3fbe119b3af04fa8a75093cdf33a573356dea0597",
+   "mean": 3.3333333333333335,
+   "model": "claude-opus-5-5",
+   "output": {
+    "reasons": [
+     "Ridge is a convincing rugged stone mass with irregular crest and shoulders, but it reads more as a broad massif than a knife-edge.",
+     "River is dead-straight as requested. Its uniform gravel/stone banks form a ruler-straight trough, artificial but true to the prompt.",
+     "East hills are smooth, broad swells with clean contour terracing. Pleasant but somewhat generic and blob-like.",
+     "Block-scale is mostly clean: no floating water or pillars. The ridge faces show stacked stone ledges and a few jagged patches, and the map edge has a sheer cut.",
+     "Materials are plausible: grass with dirt/coarse patches on hills, stone on the ridge with grass tufts on ledges. The dirt splotches are evenly scattered, and the ridge is almost entirely bare stone with an abrupt grass/stone boundary at its base."
+    ],
+    "scores": {
+     "materials": 3,
+     "minecraft_quality": 4,
+     "naturalism": 3,
+     "reference_match": null
+    },
+    "verdict": "pass"
+   },
+   "paid_usd": 0.0212748,
+   "passed": true,
+   "usage": {
+    "cache_read_tokens": 1194,
+    "cache_write_tokens": 2836,
+    "input_tokens": 4,
+    "output_tokens": 342
+   }
+  }
+ },
+ "c24": {
+  "folder": "eval/results/e2_spec",
+  "key": "i01-spec_off-s2",
+  "prompt_id": "i01",
+  "kind": "image",
+  "condition": "spec_off",
+  "judge": {
+   "cached": false,
+   "cost_usd": 0.029709799999999998,
+   "errors": [],
+   "failed": null,
+   "key": "0d6c7405eec3866d5d2497e94b088936d5516ef9be9fb6b5c9f66bb2b5eaf795",
+   "mean": 2.25,
+   "model": "claude-opus-5-5",
+   "output": {
+    "reasons": [
+     "The reference shows a broad glacial U-valley: a massive dark rocky peak with snow on the left, distant snowy ridges at center/right, a green meadow foreground and forested slopes.",
+     "The render is a symmetric V-shaped trench with a ruler-straight river down the exact center, flanked by two similar rounded hills. It reads as synthetic, not as a glaciated valley.",
+     "There are no snow caps and no forest. The peaks are smooth rounded domes, not the craggy rock faces in the photo.",
+     "Block quality is mostly clean terracing. A tiny white blob floats or sits oddly on the left, and the river corridor has steep stepped stone walls.",
+     "Materials are grass with random noise-like stone patches scattered uniformly regardless of slope, plus a stone-banded strip along the river. There is no snow, no dark rock cliffs and no tree cover, so the alpine palette is missing.",
+     "The arrangement only loosely matches the photo: a valley with mountains on both sides. The proportions, the left-dominant peak, the distant snowy range and the mood all fail to match."
+    ],
+    "scores": {
+     "materials": 2,
+     "minecraft_quality": 3,
+     "naturalism": 2,
+     "reference_match": 2
+    },
+    "verdict": "fail"
+   },
+   "paid_usd": 0.029709799999999998,
+   "passed": false,
+   "usage": {
+    "cache_read_tokens": 1194,
+    "cache_write_tokens": 4247,
+    "input_tokens": 4,
+    "output_tokens": 411
+   }
+  }
+ },
+ "c25": {
+  "folder": "eval/results/e2_spec",
+  "key": "i03-spec_off-s2",
+  "prompt_id": "i03",
+  "kind": "image",
+  "condition": "spec_off",
+  "judge": {
+   "cached": false,
+   "cost_usd": 0.031204799999999998,
+   "errors": [],
+   "failed": null,
+   "key": "c15bbc6fd7a668bd6c1bdccacf1a9b7bf229b47a10c709df17f38d1c575c0d02",
+   "mean": 2.5,
+   "model": "claude-opus-5-5",
+   "output": {
+    "reasons": [
+     "Bay with a curving sand beach and stone mountains behind it, a loose analogue of the photo's cove.",
+     "The photo's sheer limestone karst cliffs rising straight from the water are missing. The terrain uses smooth conical/ridged stone peaks and gentle terraced grass slopes instead, so the dramatic vertical walls on the left and far right never appear.",
+     "The bay is very large and plain. Its south edge runs straight along the map border with a ruler-straight sand strip, which looks synthetic.",
+     "Block-level surfaces are fairly clean: a few stray stone patches, smooth stepped slopes, no floating water or obvious spikes.",
+     "Materials are plausible but generic: grass, stone and a uniform sand band. The photo's dense jungle greenery, pale grey/orange cliff faces and turquoise shallows are absent; stone appears as large bare patches on slopes.",
+     "Mood and palette diverge from the tropical karst bay; the arrangement only partially matches (headland left, ridge behind)."
+    ],
+    "scores": {
+     "materials": 3,
+     "minecraft_quality": 3,
+     "naturalism": 2,
+     "reference_match": 2
+    },
+    "verdict": "fail"
+   },
+   "paid_usd": 0.031204799999999998,
+   "passed": false,
+   "usage": {
+    "cache_read_tokens": 1194,
+    "cache_write_tokens": 4634,
+    "input_tokens": 4,
+    "output_tokens": 389
+   }
+  }
+ },
+ "c26": {
+  "folder": "eval/results/e1_critic",
+  "key": "t04-critic_off-s2",
+  "prompt_id": "t04",
+  "kind": "text",
+  "condition": "critic_off",
+  "judge": {
+   "cached": false,
+   "cost_usd": 0.0204198,
+   "errors": [],
+   "failed": null,
+   "key": "aa5f70a91d8bc35ad2216be52fe8db7a2f6db6aeb3e5bfd77bd15bf62a824270",
+   "mean": 3.0,
+   "model": "claude-opus-5-5",
+   "output": {
+    "reasons": [
+     "Gentle rolling terrain with soft terracing reads plausibly as hills; the ridge to the north is low and broad, which suits the 'low ridge on the horizon' request.",
+     "The river meanders believably, though its width is very uniform and it ends abruptly at the map edges.",
+     "Near the ridge the river cuts a steep, narrow gorge with near-vertical sand and stone walls, a little harsh for gentle country.",
+     "The banks are a continuous one-block sand rim with some raised sand lips, a ring-like artifact; otherwise the surface is clean, with no floating water or spikes.",
+     "Materials are mostly grass with evenly scattered dirt patches that look like noise rather than natural variation; some stone shows on the ridge slopes. Plausible but repetitive."
+    ],
+    "scores": {
+     "materials": 3,
+     "minecraft_quality": 3,
+     "naturalism": 3,
+     "reference_match": null
+    },
+    "verdict": "pass"
+   },
+   "paid_usd": 0.0204198,
+   "passed": true,
+   "usage": {
+    "cache_read_tokens": 1194,
+    "cache_write_tokens": 2805,
+    "input_tokens": 4,
+    "output_tokens": 307
+   }
+  }
+ },
+ "c27": {
+  "folder": "eval/results/e1_critic",
+  "key": "t01-critic_off-s2",
+  "prompt_id": "t01",
+  "kind": "text",
+  "condition": "critic_off",
+  "judge": {
+   "cached": false,
+   "cost_usd": 0.021494799999999998,
+   "errors": [],
+   "failed": null,
+   "key": "41d3bbe92e4e52d38a2bdd81f60d37b1354c6943d8c2f8ecaf2867a7deb3427a",
+   "mean": 3.3333333333333335,
+   "model": "claude-opus-5-5",
+   "output": {
+    "reasons": [
+     "A broad grassy valley floor with a smooth meandering river feeding a lobed lake reads naturally. The mountain massifs have plausible profiles, and the taller peak rises on one side.",
+     "Mountain flanks are very uniform terraced slopes. In overview_sw the near-side mountain shows a long, fairly straight ridge face, which feels somewhat synthetic.",
+     "Block-scale cleanliness is good overall. The river sits in its channel and there are no floating water, spikes or pillars. The stair-stepping on the slopes is regular but acceptable.",
+     "Materials lean heavily on bare stone across almost all slopes. Grass appears as blobby patches, and dirt is splotched in circular spots on the valley floor. This is plausible, but the stone dominance and the dirt circles look artificial.",
+     "There is no sand or gravel at the river banks or lake shore, and no snow on the high peak, so materials are only middling."
+    ],
+    "scores": {
+     "materials": 3,
+     "minecraft_quality": 4,
+     "naturalism": 3,
+     "reference_match": null
+    },
+    "verdict": "pass"
+   },
+   "paid_usd": 0.021494799999999998,
+   "passed": true,
+   "usage": {
+    "cache_read_tokens": 1194,
+    "cache_write_tokens": 2816,
+    "input_tokens": 4,
+    "output_tokens": 358
+   }
+  }
+ },
+ "c28": {
+  "folder": "eval/results/e2_spec",
+  "key": "t03-spec_off-s2",
+  "prompt_id": "t03",
+  "kind": "text",
+  "condition": "spec_off",
+  "judge": {
+   "cached": false,
+   "cost_usd": 0.0271798,
+   "errors": [],
+   "failed": null,
+   "key": "9c63b9ad91fa4c4f22662f6d2a8432ff31e69e7f656cf345122b830c3fe92d80",
+   "mean": 2.3333333333333335,
+   "model": "claude-opus-5-5",
+   "output": {
+    "reasons": [
+     "Mesas are nearly cylindrical drums with uniform vertical walls and flat tops, evenly spaced across the map, so they read as synthetic stamps rather than eroded tablelands.",
+     "The canyon reads as a long, ruler-straight raised banded ridge running diagonally across the map, not an incised gorge. The creek is a thin channel squeezed beside it, so the canyon-and-creek relationship looks artificial.",
+     "There is an odd beige pillar or wall structure attached to the west mesa, a clear block-scale artifact. Parts of the creek edge near the map border also look broken.",
+     "Banded terracotta walls with sand caps suit desert mesas and fit the request. The tops and floor, though, are flat sand with blotchy orange and brown circular patches, and the banding wraps too evenly around each mesa.",
+     "Overall the palette is right but the landforms look procedural, and the canyon does not convincingly read as a canyon."
+    ],
+    "scores": {
+     "materials": 3,
+     "minecraft_quality": 2,
+     "naturalism": 2,
+     "reference_match": null
+    },
+    "verdict": "fail"
+   },
+   "paid_usd": 0.0271798,
+   "passed": false,
+   "usage": {
+    "cache_read_tokens": 1194,
+    "cache_write_tokens": 2825,
+    "input_tokens": 4,
+    "output_tokens": 640
+   }
+  }
+ },
+ "c29": {
+  "folder": "eval/results/e1_critic",
+  "key": "t07-critic_on-s1",
+  "prompt_id": "t07",
+  "kind": "text",
+  "condition": "critic_on",
+  "judge": {
+   "cached": false,
+   "cost_usd": 0.0211148,
+   "errors": [],
+   "failed": null,
+   "key": "09ef111bf2f486308f8980d042df9caa1fac57e7a1f8f6f5180a4f4705da30d5",
+   "mean": 3.3333333333333335,
+   "model": "claude-opus-5-5",
+   "output": {
+    "reasons": [
+     "The plateau top is almost perfectly flat with uniform dirt speckles scattered evenly across it, which reads as synthetic. Still, it was requested as flat-topped.",
+     "The sea cliffs are steep, layered stone with a natural wavy coastline, small grassy ledges and beach strips at the base, which looks convincing.",
+     "The peak has a believable form with ridges and a snow cap, but it is quite narrow and spire-like. It rises abruptly from the dead-flat plain with terraced contour rings at its base.",
+     "Block quality is mostly clean: no floating water or pillars. The cliff faces show some striated stepping.",
+     "Materials are plausible (grass, stone cliffs, sand beach, snow cap), but the random dirt patches on the plateau look like noise. There is also an odd sand-and-gravel strip along the south map edge in the sea."
+    ],
+    "scores": {
+     "materials": 3,
+     "minecraft_quality": 4,
+     "naturalism": 3,
+     "reference_match": null
+    },
+    "verdict": "pass"
+   },
+   "paid_usd": 0.0211148,
+   "passed": true,
+   "usage": {
+    "cache_read_tokens": 1194,
+    "cache_write_tokens": 2832,
+    "input_tokens": 4,
+    "output_tokens": 335
+   }
+  }
+ },
+ "c30": {
+  "folder": "eval/results/e1_critic",
+  "key": "t07-critic_on-s2",
+  "prompt_id": "t07",
+  "kind": "text",
+  "condition": "critic_on",
+  "judge": {
+   "cached": false,
+   "cost_usd": 0.026066,
+   "errors": [],
+   "failed": null,
+   "key": "c0fc1d7264586d3679c729480d5ce11d78850a4313fc9b6059d859a418b976db",
+   "mean": 2.0,
+   "model": "claude-opus-5-5",
+   "output": {
+    "reasons": [
+     "Entire terrain is gray stone/andesite: plateau top, cliffs and peak all share one palette, with no grass, dirt, sand beach or snow, so materials are essentially one block everywhere.",
+     "The plateau is very flat and box-like, and the sea cliff is a near-vertical straight wall with regular horizontal terracing stripes, which reads synthetic.",
+     "The peak is a smooth double-lobed Gaussian bump sitting on the flat plateau with no foothills or erosion; there is also an odd sunken flat area in the NE with a rectangular step wall.",
+     "Block-scale geometry is mostly clean, with no floating water or spikes, but the cliff strata stripes and abrupt map-edge walls look artificial."
+    ],
+    "scores": {
+     "materials": 1,
+     "minecraft_quality": 3,
+     "naturalism": 2,
+     "reference_match": null
+    },
+    "verdict": "fail"
+   },
+   "paid_usd": 0.026066,
+   "passed": false,
+   "usage": {
+    "cache_read_tokens": 0,
+    "cache_write_tokens": 4026,
+    "input_tokens": 4,
+    "output_tokens": 296
+   }
+  }
+ }
+}
