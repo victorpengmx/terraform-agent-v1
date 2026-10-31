@@ -286,7 +286,8 @@ def limitations(rows: list[dict[str, Any]], calibrated: bool) -> list[str]:
     if shared["critic"]:
         out.append(f"- The judge shares the critic's model family in {shared['critic']} runs: it may share the taste the "
                    "critic optimized for, which favours critic_on in E1.")
-    out.append("- The judge is human-calibrated (E3 below)." if calibrated else
+    out.append(("- The judge was checked against one person's ratings (E3 above); its pass/fail is part of success, "
+                "so read the success rates with E3's agreement in mind.") if calibrated else
                "- The judge is not yet calibrated against human ratings (E3 pending); its pass/fail is part of success.")
     if judge_unknown:
         out.append(f"- {judge_unknown} runs have no usable judge verdict; their success is unknown and left out of the success rates.")

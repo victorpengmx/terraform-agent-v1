@@ -23,6 +23,7 @@ import html
 import json
 import random
 import shutil
+import sys
 from collections import defaultdict
 from pathlib import Path
 from statistics import mean
@@ -232,6 +233,7 @@ def main() -> None:
     c = sub.add_parser("score")
     c.add_argument("name")
     args = ap.parse_args()
+    sys.stdout.reconfigure(encoding="utf-8", errors="replace")
     if args.cmd == "sample":
         out = sample(args.folders, args.name, args.n, args.screenshots)
         print(f"wrote {out / 'sheet.html'} and {out / 'ratings.csv'}")
