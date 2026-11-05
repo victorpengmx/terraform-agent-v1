@@ -1,6 +1,6 @@
 # Evaluation report: pilot_haiku
 
-Generated 2026-10-31 from `eval/results/pilot_haiku`: 4 finished runs, code cc02e86.
+Generated 2026-10-31 from `eval/results/pilot_haiku`: 4 finished runs, code 0073377.
 
 Success = no failed major answer-key item (matcher mode) AND no failed blocking/major programmatic check AND judge pass. The checklist pass rate is reported as a continuous score.
 

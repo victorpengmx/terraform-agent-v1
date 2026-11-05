@@ -1,6 +1,6 @@
 # Evaluation report: opus_images
 
-Generated 2026-11-05 from `eval/results/opus_images`: 5 finished runs, code 048e94b.
+Generated 2026-11-05 from `eval/results/opus_images`: 5 finished runs, code 4add2fb.
 
 Success = no failed major answer-key item (matcher mode) AND no failed blocking/major programmatic check AND judge pass. The checklist pass rate is reported as a continuous score.
 

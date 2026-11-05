@@ -31,6 +31,13 @@ docs/images/fjords.jpg
 docs/images/beach1.webp
 docs/images/mesa3.webp
 docs/images/mesa2.webp
+# Images with no known source (purged from history 2026-11-06, kept locally only)
+docs/images/beach.jpg
+docs/images/mesa.jpg
+docs/images/snowypeaks.jpg
+docs/images/snowypeaks1.png
+docs/images/valley.png
+docs/images/valley1.jpg
 
 # Eval run outputs (traces, stacks, renders) and the judge cache; reports, configs and baselines are committed
 eval/results/
