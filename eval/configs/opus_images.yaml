@@ -1,0 +1,12 @@
+# Opus as builder and critic on the 5 image prompts: 5 x seed 1 x critic_on = 5 runs.
+# Pairs with e1_critic's critic_on seed-1 runs (Haiku builder, Gemini critic) by (prompt, seed).
+name: opus_images
+prompts: [i01, i02, i03, i04, i05]
+seeds: [1]
+models: {builder: claude-opus-5-5, critic: claude-opus-5-5, judge: gemini-3.8-flash}
+render: l2
+size: [256, 256]
+compare_both_orders: true
+budget: {max_steps: 40, max_cost_usd: 3.00, max_seconds: 1800}
+conditions:
+  critic_on: {critic: true, rounds: 3, use_spec: true}

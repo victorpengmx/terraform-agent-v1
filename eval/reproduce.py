@@ -10,7 +10,7 @@ the sequence. Runs resume: finished runs are skipped, so re-running an experimen
 --print shows the commands without running anything.
 
 Phase C order: pilot_haiku (pipeline check, every role on Haiku), pilot (the eval models), e1, e2, report;
-then calibration_sample, your ratings, calibration_score. opus and regression are optional.
+then calibration_sample, your ratings, calibration_score. opus, opus_images and regression are optional.
 """
 
 from __future__ import annotations
@@ -44,6 +44,7 @@ EXPERIMENTS: dict[str, list[list[str]]] = {
     "e2": [run_eval("e2_spec"), rescore("e2_spec")],
     "report": [report(REPORT, "e1_critic", "e2_spec")],
     "opus": [run_eval("opus"), rescore("opus"), report("opus", "opus")],
+    "opus_images": [run_eval("opus_images"), rescore("opus_images"), report("opus_images", "opus_images")],
     "regression": [["eval.regression", "--paid"]],
     "calibration_sample": [["eval.calibrate", "sample", "eval/results/e1_critic", "eval/results/e2_spec", "--name", REPORT]],
     "calibration_score": [["eval.calibrate", "score", REPORT], report(REPORT, "e1_critic", "e2_spec", calibration=REPORT)],
