@@ -45,3 +45,6 @@ eval/cache/
 eval/calibration/*/images/
 eval/calibration/*/stacks/
 eval/calibration/*/screenshots/
+
+# Local interview-prep and resume notes (never public)
+notes/
