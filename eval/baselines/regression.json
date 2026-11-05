@@ -1,0 +1,35 @@
+{
+ "date": "2026-11-01",
+ "git": {
+  "commit": "048e94b1e07899fba13377e4883b03ded85efb20",
+  "dirty": true
+ },
+ "prompts": {
+  "i01": {
+   "cost_usd": 0.05820905999999999,
+   "pass_rate": 0.6,
+   "success": false
+  },
+  "t01": {
+   "cost_usd": 0.021002975,
+   "pass_rate": 1.0,
+   "success": true
+  },
+  "t03": {
+   "cost_usd": 0.041036844999999995,
+   "pass_rate": 1.0,
+   "success": false
+  },
+  "t05": {
+   "cost_usd": 0.08257125499999998,
+   "pass_rate": 1.0,
+   "success": false
+  },
+  "t09": {
+   "cost_usd": 0.07271359,
+   "pass_rate": 0.75,
+   "success": false
+  }
+ },
+ "results": "eval/results/regression-048e94b-dirty"
+}
