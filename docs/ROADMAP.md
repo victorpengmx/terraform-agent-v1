@@ -42,8 +42,9 @@ Sessions: name the item at the start; check it off and commit when done.
 - [ ] Hand-scripted demos (valley, island, mesa) that look good in game; compile script with dry run
       Code done (`scripts/demos.py`, `scripts/compile_world.py --dry-run`); the in-game check is not
       recorded in EVIDENCE.md.
-- [ ] Before/after images for the README (L2 + in-game)
-      `scripts/readme_shots.py` exists; no `docs/images/` or README yet.
+- [x] Before/after images for the README (L2 + in-game)
+      2026-11-07: t01 and Opus i05 builds compiled into TerraformEval (z = 400), L2 + in-game pairs and two
+      evidence before/after pairs in `docs/images/`, stacks in `docs/showcase/`.
 
 ### M3. Harness v1 (§9, §13)
 
@@ -129,15 +130,19 @@ Done 2026-11-01: `eval/reports/2026-11-01-m6.md` (results summary in DESIGN §16
 ### M7. Presentable repo
 
 - [ ] Make the repo public; confirm no keys in history
-- [ ] Image licenses: `docs/images/beach1.webp` and `mesa2.webp` (no license, watermarked stock) are untracked
+      No keys found (2026-11-06 scan); public switch is the owner's.
+- [x] Image licenses: `docs/images/beach1.webp` and `mesa2.webp` (no license, watermarked stock) are untracked
       but still in pushed history (`feeff35`): rewrite history or clear them. Find sources for `beach.jpg`,
       `mesa.jpg`, `snowypeaks.jpg`, `snowypeaks1.png`, `valley.png`, `valley1.jpg`, or drop them
-- [ ] README: what it is, architecture diagram, the LLM/code split in 3 sentences, a text and an image
+      2026-11-06: all eight purged from history (git filter-repo, cited ids remapped), force-pushed 2026-11-07.
+- [x] README: what it is, architecture diagram, the LLM/code split in 3 sentences, a text and an image
       example (input → build), before/after images,
       results table, short related work (§17), limitations, next steps
-- [ ] Interview prep: walk through the harness, critic, context manager and one op end to end; 2–3
+      2026-11-07: `README.md`; no license (all rights reserved).
+- [x] Interview prep: walk through the harness, critic, context manager and one op end to end; 2–3
       failures found in traces and how they were fixed (from EVIDENCE.md)
-- [ ] Resume bullets from real numbers only
+- [x] Resume bullets from real numbers only
+      Both in gitignored `notes/` (local only).
 
 **If time is short**, cut in this order: the tool catalogue; the island/mesa demos; image input (ship
 text-only, keep the design); v1 relations (keep features and categories, which the eval needs); the SPEC

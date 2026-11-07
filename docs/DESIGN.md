@@ -1213,9 +1213,10 @@ as the unit of planning and checking, and its own runtime, critic and evaluation
 
 ```
 terraform-agent/
+  README.md                 # overview, examples, results (§16), credits
   CLAUDE.md
   pyproject.toml            # amulet-core==1.9.49; extras: dev, render
-  docs/                     # DESIGN.md, ROADMAP.md, EVIDENCE.md, images/ (README shots)
+  docs/                     # DESIGN.md, ROADMAP.md, EVIDENCE.md, images/ (README shots), showcase/ (their op stacks)
   terrain/
     config.py               # WORLD_MIN_Y, WORLD_MAX_Y
     state.py                # WorldState, features, to_xz / to_uv coordinates
