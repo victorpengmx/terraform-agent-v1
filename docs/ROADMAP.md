@@ -129,8 +129,8 @@ Done 2026-11-01: `eval/reports/2026-11-01-m6.md` (results summary in DESIGN §16
 
 ### M7. Presentable repo
 
-- [ ] Make the repo public; confirm no keys in history
-      No keys found (2026-11-06 scan); public switch is the owner's.
+- [x] Make the repo public; confirm no keys in history
+      No keys found (2026-11-06 scan); public since 2026-11-07, README and images load unauthenticated.
 - [x] Image licenses: `docs/images/beach1.webp` and `mesa2.webp` (no license, watermarked stock) are untracked
       but still in pushed history (`feeff35`): rewrite history or clear them. Find sources for `beach.jpg`,
       `mesa.jpg`, `snowypeaks.jpg`, `snowypeaks1.png`, `valley.png`, `valley1.jpg`, or drop them
